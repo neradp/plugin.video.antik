@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags must have the form vX.Y.Z."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/master; then
+            echo "::error::The tagged commit must be on master."
+            exit 1
+          fi
+
+          version="${GITHUB_REF_NAME#v}"
+          addon_version="$(python3 -c 'import xml.etree.ElementTree as ET; print(ET.parse("addon.xml").getroot().attrib["version"])')"
+          if [[ "$version" != "$addon_version" ]]; then
+            echo "::error::The tag version must match addon.xml."
+            exit 1
+          fi
+
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v version="$GITHUB_REF_NAME" '
+            { sub(/\r$/, "") }
+            index($0, "## " version " - ") == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+            END { if (!found) exit 1 }
+          ' CHANGELOG.md > "$notes" || {
+            echo "::error::No matching version found in CHANGELOG.md."
+            exit 1
+          }
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "::error::The changelog entry is empty."
+            exit 1
+          fi
+
+          if [[ -n "$(git ls-tree -r --name-only "$GITHUB_SHA" -- resources/stations)" ]]; then
+            echo "::error::Generated station logos must not be included in the release."
+            exit 1
+          fi
+
+          archive="$RUNNER_TEMP/plugin.video.antik-$version.zip"
+          git archive --format=zip --prefix=plugin.video.antik/ --output="$archive" \
+            "$GITHUB_SHA" addon.xml main.py service.py icon.jpg resources \
+            LICENSE.txt
+          gh release create "$GITHUB_REF_NAME" "$archive" \
+            --verify-tag --title "Antik TV $GITHUB_REF_NAME" --notes-file "$notes"
