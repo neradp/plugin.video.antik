@@ -6,12 +6,12 @@ import xbmcaddon
 import xbmcvfs
 
 from datetime import datetime, timezone
-from urllib.parse import quote
 from math import ceil
 
 from resources.lib.channels import Channels
 from resources.lib.utils import plugin_id, replace_by_html_entity
 from resources.lib.epg import get_channels_epg
+from resources.lib.station_logos import channel_logo
 
 tz_offset = int(datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 3600)
 
@@ -62,12 +62,7 @@ def generate_playlist(output_file = ''):
         else:
             file.write(bytearray(('#EXTM3U\n').encode('utf-8')))
             for number in sorted(channels_list.keys()):  
-                if addon.getSetting('use_picons_server') == 'true':
-                    logo = 'http://' + addon.getSetting('picons_server_ip') + ':' + addon.getSetting('picons_server_port') + '/picons/' + quote(channels_list[number]['name'])
-                else:
-                    logo = channels_list[number]['logo']
-                    if logo is None:
-                        logo = ''
+                logo = channel_logo(channels_list[number], addon) or channels_list[number].get('logo') or ''
                 if 'archive' not in channels_list[number] or channels_list[number]['archive'] == True:                    
                     if addon.getSetting('catchup_mode') == 'default':
                         line = '#EXTINF:-1 catchup="default" catchup-days="7" catchup-source="plugin://' + plugin_id + '/?action=iptsc_play_stream&id=' + str(channels_list[number]['id']) + '&catchup_start_ts={utc}&catchup_end_ts={utcend}" tvg-chno="' + str(number) + '" tvg-id="' + channels_list[number]['name'] + '" tvh-epg="0" tvg-logo="' + logo + '",' + channels_list[number]['name']
@@ -116,17 +111,12 @@ def generate_epg(output_file = '', show_progress = True):
                 file.write(bytearray(('<tv generator-info-name="EPG grabber">\n').encode('utf-8')))
                 content = ''
                 for number in sorted(channels_list.keys()):
-                    if addon.getSetting('use_picons_server') == 'true':
-                        logo = 'http://' + addon.getSetting('picons_server_ip') + ':' + addon.getSetting('picons_server_port') + '/picons/' + quote(channels_list[number]['name'])
-                    else:
-                        logo = channels_list[number]['logo']
-                        if logo is None:
-                            logo = ''
+                    logo = channel_logo(channels_list[number], addon) or channels_list[number].get('logo') or ''
                     channels_ids.append(channels_list[number]['id'])
                     channel = channels_list[number]['name']
                     content = content + '    <channel id="' + replace_by_html_entity(channel) + '">\n'
                     content = content + '            <display-name lang="cs">' + replace_by_html_entity(channel) + '</display-name>\n'
-                    content = content + '            <icon src="' + logo + '" />\n'
+                    content = content + '            <icon src="' + replace_by_html_entity(logo) + '" />\n'
                     content = content + '    </channel>\n'
                 file.write(bytearray((content).encode('utf-8')))
                 if show_progress == True:
