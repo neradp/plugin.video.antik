@@ -1,4 +1,4 @@
-﻿<addon id="plugin.video.antik" name="Antik TV" provider-name="waladir" version="1.1.9">
+﻿<addon id="plugin.video.antik" name="Antik TV" provider-name="waladir, neradp" version="0.0.1">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.requests" version="2.18.4"/>
@@ -10,42 +10,28 @@
   </extension>
   <extension library="service.py" point="xbmc.service"/>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Antik TV</summary>
-    <summary lang="sk_SK">Antik TV</summary>
-    <summary lang="cs_CZ">Antik TV</summary>
+    <summary lang="en_GB">Unofficial Antik TV add-on fork</summary>
+    <summary lang="sk_SK">Neoficiálny fork doplnku Antik TV</summary>
+    <summary lang="cs_CZ">Neoficiální fork doplňku Antik TV</summary>
     <description lang="en_GB">
-Doplněk pro Antik TV (CZ i SK)
-
-Další informace a podporu najdete na fóru www.xbmc-kodi.cz (https://www.xbmc-kodi.cz/prispevek-antik-tv--13396)    
+An independent personal fork of the Antik TV add-on for Slovakia and the Czech Republic.
+Based on the original add-on by waladir. Not affiliated with or supported by Antik.
     </description>
     <description lang="sk_SK">
-Doplněk pro Antik TV (CZ i SK)
-
-Další informace a podporu najdete na fóru www.xbmc-kodi.cz (https://www.xbmc-kodi.cz/prispevek-antik-tv--13396)    
+Nezávislý osobný fork doplnku Antik TV pre Slovensko a Českú republiku.
+Vychádza z pôvodného doplnku od waladira. Nie je spojený s Antikom ani ním podporovaný.
     </description>
     <description lang="cs_CZ">
-Doplněk pro Antik TV (CZ i SK)
-
-Další informace a podporu najdete na fóru www.xbmc-kodi.cz (https://www.xbmc-kodi.cz/prispevek-antik-tv--13396)    
+Nezávislý osobní fork doplňku Antik TV pro Slovensko a Českou republiku.
+Vychází z původního doplňku od waladira. Není spojený s Antikem ani jím podporovaný.
     </description>
     <platform>all</platform>
-    <source>https://github.com/waladir/plugin.video.antik</source>
+    <source>https://github.com/neradp/plugin.video.antik</source>
     <news>
-v1.1.9 (5.11.2026)
-- oprava přehrávání archivu
+v0.0.1
+- Personal fork: archive search, artwork, station logos and playback improvements
 
-v1.1.8 (13.10.2026)
-- úprava posílání cookies (Kodi 22)
-
-v1.1.7 (9.8.2026)
-- rozšíření počtu dnů pro generování EPG (20/14)
-- možnost filtrování kanálů pro EPG
-
-v1.1.6 (17.7.2026)
-- upravené přehrávání streamů
-
-v1.1.5 (16.7.2026)
-- upravené přehrávání streamů
+Based on the original add-on version 1.1.9 by waladir.
    </news>
     <assets>
         <icon>icon.jpg</icon>
