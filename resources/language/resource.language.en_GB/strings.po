@@ -426,3 +426,7 @@ msgstr ""
 msgctxt "#300220"
 msgid "Zadajte názov na vyhľadanie"
 msgstr ""
+
+msgctxt "#300221"
+msgid "Download with Stream Saver"
+msgstr ""

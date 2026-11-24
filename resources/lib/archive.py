@@ -17,6 +17,15 @@ from resources.lib.station_logos import channel_logo
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
 
+
+def add_download_menu(list_item, epg, addon):
+    download_url = get_url(action = 'download_archive', id = epg['channel_id'],
+                           start = epg['start'], stop = epg['stop'], title = epg['title'])
+    list_item.addContextMenuItems([
+        (addon.getLocalizedString(300221), 'RunPlugin({})'.format(download_url))
+    ])
+
+
 def list_archive(label):
     addon = xbmcaddon.Addon()    
     xbmcplugin.setPluginCategory(_handle, label)
@@ -80,6 +89,7 @@ def search_archive(label, query = None):
             list_item.setProperty('IsPlayable', 'true')
             list_item.setContentLookup(False)
             url = get_url(action = 'play_archive', id = epg['channel_id'], start = epg['start'], stop = epg['stop'])
+            add_download_menu(list_item, epg, addon)
             xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
@@ -131,5 +141,6 @@ def list_program(id, day_min, label):
                 list_item.setProperty('IsPlayable', 'true')
                 list_item.setContentLookup(False)
                 url = get_url(action='play_archive', id = epg[key]['channel_id'], start = epg[key]['start'], stop = epg[key]['stop'])
+                add_download_menu(list_item, epg[key], addon)
                 xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)

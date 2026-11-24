@@ -428,3 +428,7 @@ msgstr "Chyba při vyhledávání v archivu"
 msgctxt "#300220"
 msgid "Zadajte názov na vyhľadanie"
 msgstr "Zadejte název pro vyhledání"
+
+msgctxt "#300221"
+msgid "Download with Stream Saver"
+msgstr "Stáhnout přes Stream Saver"

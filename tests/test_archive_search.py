@@ -156,6 +156,28 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertFalse(args[3])
         args[2].setProperty.assert_called_with('IsPlayable', 'true')
 
+    def test_download_menu_in_search_and_day_program(self):
+        from urllib.parse import parse_qs, urlencode, urlsplit
+        self.archive.get_url = lambda **kwargs: 'plugin://plugin.video.antik/?' + urlencode(kwargs)
+        now = datetime.now().timestamp()
+        program = {'title': 'Film, (Život) & spol.', 'startts': now - 3600, 'endts': now - 60,
+                   'channel_id': '1', 'start': 'start+01:00', 'stop': 'stop'}
+        self.channels.get_channels_list.return_value = {'1': {'id': '1', 'name': 'One'}}
+        self.search.return_value = [program]
+        self.archive.get_channel_epg.return_value = {1: program}
+        for display in (lambda: self.archive.search_archive('Archive', 'Film'),
+                        lambda: self.archive.list_program('1', '0', 'Archive')):
+            self.plugin.addDirectoryItem.reset_mock()
+            display()
+            item = self.plugin.addDirectoryItem.call_args.args[2]
+            label, command = item.addContextMenuItems.call_args.args[0][0]
+            self.assertEqual(label, '300221')
+            self.assertTrue(command.startswith('RunPlugin(') and command.endswith(')'))
+            params = parse_qs(urlsplit(command[len('RunPlugin('):-1]).query)
+            self.assertEqual(params, {'action': ['download_archive'], 'id': ['1'],
+                                      'start': ['start+01:00'], 'stop': ['stop'],
+                                      'title': ['Film, (Život) & spol.']})
+
     def test_archive_channel_folder_uses_logo(self):
         self.channels.get_channels_list.return_value = {
             1: {'id': '1', 'name': 'One', 'archive': True, 'archive_days': 14},
@@ -490,6 +512,9 @@ class ArchiveSearchRouterTests(unittest.TestCase):
             archive.search_archive.assert_called_with(label='Archive', query=None)
             main.router('action=update_station_logos')
             modules['resources.lib.logo_updater'].update_station_logos.assert_called_once()
+            main.router('action=download_archive&id=1&start=a&stop=b&title=Film%2C+%C5%BDivot')
+            modules['resources.lib.stream'].play_archive.assert_called_once_with(
+                id='1', start='a', stop='b', download=True, title='Film, Život')
 
 
 if __name__ == '__main__':

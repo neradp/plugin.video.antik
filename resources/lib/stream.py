@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
+import base64
 
+import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
@@ -90,7 +92,7 @@ def play_live(id):
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300218), xbmcgui.NOTIFICATION_ERROR, 5000)
 
 
-def play_archive(id, start, stop):
+def play_archive(id, start, stop, download = False, title = 'Antik archive'):
     kodi = get_kodi_version()
     addon = xbmcaddon.Addon()
     session = Session()
@@ -103,6 +105,13 @@ def play_archive(id, start, stop):
         url = get_api_url() + 'archive/playShow/' + response['showIdentifier']
         cookies = '; '.join(f'{name}={value}' for name, value in session.get_cookies().items())
         headers = urlencode({'Cookie': cookies, 'User-Agent': ua, 'Referer': 'https://webtv.tv'})
+        if download:
+            payload = base64.urlsafe_b64encode(
+                json.dumps({'url': url + '|' + headers, 'title': title}, ensure_ascii = False).encode('utf-8')
+            ).decode('ascii').rstrip('=')
+            xbmc.executebuiltin('RunScript(script.stream.saver,add,{})'.format(payload))
+            xbmcplugin.endOfDirectory(_handle, succeeded = True)
+            return
         list_item = xbmcgui.ListItem(path = url + '|' + headers)
         if 'radio' not in channels_list[id] or channels_list[id]['radio'] == 0:
             list_item.setProperty('inputstream', 'inputstream.adaptive')
@@ -114,3 +123,5 @@ def play_archive(id, start, stop):
         xbmcplugin.setResolvedUrl(_handle, True, list_item)
     else:
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300218), xbmcgui.NOTIFICATION_ERROR, 5000)
+        if download:
+            xbmcplugin.endOfDirectory(_handle, succeeded = False)

@@ -63,6 +63,9 @@ def router(paramstring):
             list_program(id = params['id'], day_min = params['day_min'], label = params['label'])
         elif params['action'] == 'play_archive':
             play_archive(id = params['id'], start = params['start'], stop = params['stop'])
+        elif params['action'] == 'download_archive':
+            play_archive(id = params['id'], start = params['start'], stop = params['stop'],
+                         download = True, title = params.get('title', 'Antik archive'))
 
         elif params['action'] == 'manage_channels':
             manage_channels(label = params['label'])
