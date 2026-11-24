@@ -3,7 +3,7 @@ import sqlite3
 import time
 
 
-CACHE_SECONDS = 15 * 24 * 60 * 60
+CACHE_SECONDS = 20 * 24 * 60 * 60
 
 
 class ArtworkCache:
@@ -11,9 +11,14 @@ class ArtworkCache:
         self.connection = sqlite3.connect(path, timeout = 5)
         try:
             with self.connection:
+                self.connection.execute('BEGIN IMMEDIATE')
                 self.connection.execute(
                     'CREATE TABLE IF NOT EXISTS artwork_cache '
                     '(key TEXT PRIMARY KEY, expires REAL NOT NULL, value TEXT NOT NULL)')
+                version = self.connection.execute('PRAGMA user_version').fetchone()[0]
+                if version == 0:
+                    self.connection.execute('UPDATE artwork_cache SET expires = expires + ?', (5 * 24 * 60 * 60,))
+                    self.connection.execute('PRAGMA user_version = 1')
                 self.connection.execute('DELETE FROM artwork_cache WHERE expires <= ?', (time.time(),))
         except sqlite3.Error:
             self.connection.close()

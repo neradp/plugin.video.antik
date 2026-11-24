@@ -407,8 +407,12 @@ class ArtworkCacheTests(unittest.TestCase):
             with module.ProgramArtwork(addon) as artwork:
                 self.assertEqual(artwork.get(dict(program, start='other'))['fanart'], url)
             self.assertEqual(api.call_api.call_count, 2)
+            with module.ProgramArtwork(addon) as artwork:
+                artwork.get(dict(program, title=123))
+                artwork.get(dict(program, title='123'))
+            self.assertEqual(api.call_api.call_count, 3)
 
-    def test_persistent_cache_expires_after_fifteen_days(self):
+    def test_persistent_cache_expires_after_twenty_days(self):
         module = load_module('test_artwork_cache', LIB / 'artwork_cache.py')
         key = ('antik_images', 'channel', 'start', 'Film')
         art = {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
@@ -417,10 +421,32 @@ class ArtworkCacheTests(unittest.TestCase):
             with patch.object(module.time, 'time', return_value=1000000):
                 with module.ArtworkCache(path) as cache:
                     cache.put(key, art)
-            with patch.object(module.time, 'time', return_value=1000000 + 15 * 86400 - 1):
+            with patch.object(module.time, 'time', return_value=1000000 + 20 * 86400 - 1):
                 with module.ArtworkCache(path) as cache:
                     self.assertEqual(cache.get(key), (True, art))
-            with patch.object(module.time, 'time', return_value=1000000 + 15 * 86400):
+            with patch.object(module.time, 'time', return_value=1000000 + 20 * 86400):
+                with module.ArtworkCache(path) as cache:
+                    self.assertEqual(cache.get(key), (False, None))
+
+    def test_existing_cache_expiry_is_extended_only_once(self):
+        import json
+        import sqlite3
+        from contextlib import closing
+        module = load_module('test_artwork_cache_migration', LIB / 'artwork_cache.py')
+        key = ('antik_images', 'channel', 'start', 'Film')
+        art = {'fanart': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / 'cache.sqlite')
+            with closing(sqlite3.connect(path)) as db:
+                with db:
+                    db.execute('CREATE TABLE artwork_cache (key TEXT PRIMARY KEY, expires REAL NOT NULL, value TEXT NOT NULL)')
+                    db.execute('INSERT INTO artwork_cache VALUES (?, ?, ?)',
+                               (json.dumps(key, ensure_ascii=False), 1000000 + 15 * 86400, json.dumps(art)))
+            with patch.object(module.time, 'time', return_value=1000000 + 16 * 86400):
+                for _ in range(2):
+                    with module.ArtworkCache(path) as cache:
+                        self.assertEqual(cache.get(key), (True, art))
+            with patch.object(module.time, 'time', return_value=1000000 + 20 * 86400):
                 with module.ArtworkCache(path) as cache:
                     self.assertEqual(cache.get(key), (False, None))
 

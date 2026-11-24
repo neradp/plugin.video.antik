@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
+import tempfile
 
+import xbmc
 import xbmcgui
 import xbmcaddon
 import xbmcvfs
@@ -12,6 +14,7 @@ from resources.lib.channels import Channels
 from resources.lib.utils import plugin_id, replace_by_html_entity
 from resources.lib.epg import get_channels_epg
 from resources.lib.station_logos import channel_logo
+from resources.lib.program_artwork import ProgramArtwork
 
 tz_offset = int(datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 3600)
 
@@ -99,14 +102,14 @@ def generate_epg(output_file = '', show_progress = True):
             xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300315), xbmcgui.NOTIFICATION_ERROR, 5000)
             return
         output_dir = addon.getSetting('output_dir') 
+        dialog = None
         try:
             if len(output_file) > 0:
-                file = xbmcvfs.File(output_file, 'w')
+                filename = output_file
             else:
-                file = xbmcvfs.File(output_dir + 'antik_epg.xml', 'w')
-            if file == None:
-                xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300315), xbmcgui.NOTIFICATION_ERROR, 5000)
-            else:
+                filename = output_dir + 'antik_epg.xml'
+            monitor = xbmc.Monitor()
+            with tempfile.TemporaryFile() as file, ProgramArtwork(addon) as artwork:
                 file.write(bytearray(('<?xml version="1.0" encoding="UTF-8"?>\n').encode('utf-8')))
                 file.write(bytearray(('<tv generator-info-name="EPG grabber">\n').encode('utf-8')))
                 content = ''
@@ -129,6 +132,8 @@ def generate_epg(output_file = '', show_progress = True):
                         dialog.update(int(i/len(channels_ids)*100))
                     epg = get_channels_epg(channels = channels_ids[i:i+10])
                     for epg_item in epg:
+                        if monitor.abortRequested():
+                            return
                         starttime = datetime.fromtimestamp(epg_item['startts']).strftime('%Y%m%d%H%M%S')
                         endtime = datetime.fromtimestamp(epg_item['endts']).strftime('%Y%m%d%H%M%S')
                         content = content + '    <programme start="' + starttime + ' +0' + str(tz_offset) + '00" stop="' + endtime + ' +0' + str(tz_offset) + '00" channel="' + replace_by_html_entity(channels_list_by_id[epg_item['channel_id']]['name']) + '">\n'
@@ -138,6 +143,10 @@ def generate_epg(output_file = '', show_progress = True):
                         if epg_item['genres'] and epg_item['genres'] is not None:
                             for category in epg_item['genres']:
                                 content = content + '       <category>' +  replace_by_html_entity(category) + '</category>\n'
+                        art = artwork.get(epg_item)
+                        image = art.get('fanart') or art.get('poster')
+                        if image:
+                            content = content + '       <icon src="' + replace_by_html_entity(image) + '" />\n'
                         content = content + '    </programme>\n'
                         cnt = cnt + 1
                         if cnt > 20:
@@ -146,16 +155,29 @@ def generate_epg(output_file = '', show_progress = True):
                             cnt = 0
                     file.write(bytearray((content).encode('utf-8')))                          
                 file.write(bytearray(('</tv>\n').encode('utf-8')))
-                file.close()
-                if show_progress == True:
-                    dialog.close()
+                if monitor.abortRequested():
+                    return
+                file.seek(0)
+                output = xbmcvfs.File(filename, 'w')
+                if output is None:
+                    raise OSError('Unable to open EPG output')
+                try:
+                    while True:
+                        chunk = file.read(65536)
+                        if not chunk:
+                            break
+                        if not output.write(bytearray(chunk)):
+                            raise OSError('Unable to write EPG output')
+                finally:
+                    output.close()
                 xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300316), xbmcgui.NOTIFICATION_INFO, 5000)    
-        except Exception:
-            file.close()
-            if show_progress == True:
-                dialog.close()
+        except Exception as error:
+            xbmc.log('Antik TV > EPG generation failed: ' + str(error), xbmc.LOGERROR)
             xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300315), xbmcgui.NOTIFICATION_ERROR, 5000)
             sys.exit()
+        finally:
+            if dialog is not None:
+                dialog.close()
     else:
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300317), xbmcgui.NOTIFICATION_ERROR, 5000)
         sys.exit()

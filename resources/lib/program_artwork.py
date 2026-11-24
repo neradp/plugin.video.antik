@@ -47,7 +47,7 @@ class ProgramArtwork:
             return {}
 
     def _get(self, epg):
-        key = ('antik_images', epg['channel_id'], epg['start'], epg['title'])
+        key = ('antik_images', epg['channel_id'], epg['start'], str(epg['title']))
         if self.cache is not None:
             try:
                 found, art = self.cache.get(key)
