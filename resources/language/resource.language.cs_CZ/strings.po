@@ -221,14 +221,6 @@ msgctxt "#300218"
 msgid "Problém pri prehraní streamu"
 msgstr "Problém při přehrání streamu"
 
-msgctxt "#300219"
-msgid "Chyba pri vyhľadávaní v archíve"
-msgstr "Chyba při vyhledávání v archivu"
-
-msgctxt "#300220"
-msgid "Zadajte názov na vyhľadanie"
-msgstr "Zadejte název pro vyhledání"
-
 msgctxt "#300312"
 msgid "Nastav adresár pre playlist a EPG!"
 msgstr "Nastav adresář pro playlist a EPG!"
@@ -404,3 +396,11 @@ msgstr "Nízká"
 msgctxt "#30053"
 msgid "Video"
 msgstr ""
+
+msgctxt "#300219"
+msgid "Chyba pri vyhľadávaní v archíve"
+msgstr "Chyba při vyhledávání v archivu"
+
+msgctxt "#300220"
+msgid "Zadajte názov na vyhľadanie"
+msgstr "Zadejte název pro vyhledání"

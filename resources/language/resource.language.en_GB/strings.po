@@ -221,14 +221,6 @@ msgctxt "#300218"
 msgid "Problém pri prehraní streamu"
 msgstr ""
 
-msgctxt "#300219"
-msgid "Chyba pri vyhľadávaní v archíve"
-msgstr ""
-
-msgctxt "#300220"
-msgid "Zadajte názov na vyhľadanie"
-msgstr ""
-
 # dialogy
 
 msgctxt "#300300"
@@ -403,3 +395,10 @@ msgctxt "#30053"
 msgid "Video"
 msgstr ""
 
+msgctxt "#300219"
+msgid "Chyba pri vyhľadávaní v archíve"
+msgstr ""
+
+msgctxt "#300220"
+msgid "Zadajte názov na vyhľadanie"
+msgstr ""

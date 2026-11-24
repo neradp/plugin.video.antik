@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
 import sys
+import os
+import sqlite3
 import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
+import xbmcvfs
     
 from datetime import date, datetime, timedelta
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from resources.lib.utils import get_url, day_translation, day_translation_short
 from resources.lib.channels import Channels 
 from resources.lib.epg import get_channel_epg, epg_listitem, search_archive_epg
+from resources.lib.api import API
+from resources.lib.session import Session
+from resources.lib.artwork_cache import ArtworkCache
 
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
@@ -35,6 +41,51 @@ def list_archive(label):
             url = get_url(action='list_archive_days', id = channels_list[number]['id'], days = channels_list[number]['archive_days'], label = label + ' / ' + channels_list[number]['name'])  
             xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
+
+
+def get_antik_artwork(api, cookies, epg, cache, allow_network = True):
+    key = ('antik_images', epg['channel_id'], epg['start'], epg['title'])
+    if cache is not None:
+        try:
+            found, art = cache.get(key)
+            if found:
+                return art
+        except (sqlite3.Error, ValueError) as error:
+            xbmc.log('Antik TV > Artwork cache read failed: ' + type(error).__name__, xbmc.LOGWARNING)
+    if not allow_network:
+        return {}
+    post = {'channel_id' : epg['channel_id'], 'program' : {'start' : epg['start']},
+            'includes' : ['images']}
+    detail = api.call_api(api = 'program/detail', method = 'post', data = post, cookies = cookies, timeout = 10)
+    if isinstance(detail, dict) and 'err' in detail:
+        raise ConnectionError('Antik program detail request failed')
+    if not isinstance(detail, dict) or not isinstance(detail.get('images'), list):
+        raise ValueError('Invalid Antik program image response')
+    images = {}
+    for image in detail.get('images', []):
+        if not isinstance(image, dict) or image.get('type') not in ('cover', 'poster'):
+            continue
+        url = image.get('url')
+        try:
+            parsed = urlsplit(url) if isinstance(url, str) else None
+        except ValueError:
+            parsed = None
+        if (not parsed or parsed.scheme != 'https' or parsed.netloc != 'extendedepg-gonet.antik.sk'
+                or parsed.query or parsed.fragment):
+            xbmc.log('Antik TV > Ignoring invalid program image URL', xbmc.LOGWARNING)
+            continue
+        images.setdefault(image['type'], url)
+    cover = images.get('cover') or images.get('poster')
+    art = {'poster' : cover, 'thumb' : cover} if cover else {}
+    if images.get('poster'):
+        art['fanart'] = images['poster']
+    if cache is not None:
+        try:
+            cache.put(key, art)
+        except sqlite3.Error as error:
+            xbmc.log('Antik TV > Artwork cache write failed: ' + type(error).__name__, xbmc.LOGWARNING)
+    return art
+
 
 def search_archive(label, query = None):
     addon = xbmcaddon.Addon()
@@ -63,6 +114,18 @@ def search_archive(label, query = None):
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300219), xbmcgui.NOTIFICATION_ERROR, 5000)
         xbmcplugin.endOfDirectory(_handle, succeeded = False, cacheToDisc = False)
         return
+    use_antik_artwork = bool(results)
+    allow_antik_network = True
+    antik_cache = None
+    if results:
+        api = API()
+        cookies = Session().get_cookies()
+        try:
+            profile = xbmcvfs.translatePath(addon.getAddonInfo('profile'))
+            os.makedirs(profile, exist_ok = True)
+            antik_cache = ArtworkCache(os.path.join(profile, 'antik-artwork-cache.sqlite3'))
+        except (OSError, sqlite3.Error) as error:
+            xbmc.log('Antik TV > Antik artwork cache unavailable: ' + type(error).__name__, xbmc.LOGWARNING)
     for epg in results:
         start = datetime.fromtimestamp(epg['startts'])
         end = datetime.fromtimestamp(epg['endts'])
@@ -70,10 +133,21 @@ def search_archive(label, query = None):
         item_label = (day_translation_short[start.strftime('%w')] + ' ' + start.strftime('%d.%m %H:%M') +
                       ' - ' + end.strftime('%H:%M') + ' | ' + channel['name'] + ' | ' + epg['title'])
         list_item = epg_listitem(xbmcgui.ListItem(label = item_label), epg, None)
+        if use_antik_artwork:
+            try:
+                antik_art = get_antik_artwork(api, cookies, epg, antik_cache, allow_antik_network)
+                if antik_art:
+                    list_item.setArt(antik_art)
+            except (ConnectionError, ValueError, TypeError, KeyError) as error:
+                xbmc.log('Antik TV > Antik artwork lookup failed: ' + type(error).__name__, xbmc.LOGWARNING)
+                if isinstance(error, ConnectionError):
+                    allow_antik_network = False
         list_item.setProperty('IsPlayable', 'true')
         list_item.setContentLookup(False)
         url = get_url(action = 'play_archive', id = epg['channel_id'], start = epg['start'], stop = epg['stop'])
         xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
+    if antik_cache is not None:
+        antik_cache.close()
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
 def list_archive_days(id, label, days):

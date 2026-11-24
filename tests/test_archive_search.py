@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import tempfile
 import types
 import unittest
 from datetime import datetime, timedelta
@@ -102,13 +103,19 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.xbmc, self.gui, self.plugin, self.addon = (MagicMock() for _ in range(4))
         self.addon.Addon.return_value.getLocalizedString.side_effect = str
         self.channels, self.search = MagicMock(), MagicMock()
+        self.antik_cache = MagicMock()
+        self.antik_cache.get.return_value = (False, None)
+        self.cache = MagicMock(return_value=self.antik_cache)
         modules = {
             'xbmc': self.xbmc, 'xbmcgui': self.gui, 'xbmcplugin': self.plugin,
             'xbmcaddon': self.addon,
+            'xbmcvfs': types.SimpleNamespace(translatePath=lambda path: 'profile'),
             'resources.lib.utils': types.SimpleNamespace(
                 get_url=lambda **kwargs: kwargs, day_translation={},
                 day_translation_short={str(i): str(i) for i in range(7)}),
             'resources.lib.channels': types.SimpleNamespace(Channels=lambda: self.channels),
+            'resources.lib.api': MagicMock(), 'resources.lib.session': MagicMock(),
+            'resources.lib.artwork_cache': types.SimpleNamespace(ArtworkCache=self.cache),
             'resources.lib.epg': types.SimpleNamespace(
                 get_channel_epg=MagicMock(),
                 epg_listitem=lambda item, epg, logo: item,
@@ -118,8 +125,12 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.modules_patch.start()
         self.archive = load_module('test_archive', LIB / 'archive.py')
         self.archive._handle = 1
+        self.archive.API.return_value.call_api.return_value = {'images': []}
+        self.makedirs_patch = patch.object(self.archive.os, 'makedirs')
+        self.makedirs_patch.start()
 
     def tearDown(self):
+        self.makedirs_patch.stop()
         self.modules_patch.stop()
 
     def test_playable_results_and_existing_channel_rules(self):
@@ -168,6 +179,108 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.gui.Dialog.return_value.notification.assert_called_once()
         self.assertFalse(self.plugin.endOfDirectory.call_args.kwargs['succeeded'])
 
+    def test_antiks_images_are_attached(self):
+        self.channels.get_channels_list.return_value = {
+            '1': {'id': '1', 'name': 'One', 'archive': True, 'archive_days': 14},
+        }
+        self.search.return_value = [{
+            'channel_id': '1', 'title': 'Film', 'startts': 1000000000,
+            'endts': 1000003600, 'start': 'start', 'stop': 'stop',
+        }]
+        cover = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
+        landscape = 'https://extendedepg-gonet.antik.sk/programme_icon/2'
+        self.archive.API.return_value.call_api.return_value = {
+            'images': [{'type': 'cover', 'url': cover}, {'type': 'poster', 'url': landscape}],
+        }
+        self.archive.search_archive('Archive', query='Film')
+        item = self.plugin.addDirectoryItem.call_args.args[2]
+        item.setArt.assert_called_once_with({'poster': cover, 'thumb': cover, 'fanart': landscape})
+        item.setProperty.assert_called_with('IsPlayable', 'true')
+        call = self.archive.API.return_value.call_api.call_args.kwargs
+        self.assertEqual(call['api'], 'program/detail')
+        self.assertEqual(call['data'], {
+            'channel_id': '1', 'program': {'start': 'start'}, 'includes': ['images']})
+        self.assertEqual(call['cookies'], self.archive.Session.return_value.get_cookies.return_value)
+        self.assertEqual(call['timeout'], 10)
+        self.antik_cache.close.assert_called_once()
+
+    def test_cached_artwork_and_untrusted_urls(self):
+        self.channels.get_channels_list.return_value = {
+            '1': {'id': '1', 'name': 'One', 'archive': True, 'archive_days': 14},
+        }
+        self.search.return_value = [{
+            'channel_id': '1', 'title': 'Film', 'startts': 1000000000,
+            'endts': 1000003600, 'start': 'start', 'stop': 'stop',
+        }]
+        self.antik_cache.get.return_value = (True, {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
+                                                    'thumb': 'https://extendedepg-gonet.antik.sk/programme_icon/1'})
+        self.archive.search_archive('Archive', query='Film')
+        self.archive.API.return_value.call_api.assert_not_called()
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once()
+
+        self.antik_cache.get.return_value = (False, None)
+        self.archive.API.return_value.call_api.return_value = {
+            'images': [{'type': 'cover', 'url': 'https://example.com/image.jpg'},
+                       {'type': 'poster', 'url': 'http://extendedepg-gonet.antik.sk/image.jpg'},
+                       {'type': 'poster', 'url': 'https://extendedepg-gonet.antik.sk/image.jpg?token=secret'}],
+        }
+        self.gui.ListItem.reset_mock()
+        self.archive.search_archive('Archive', query='Film')
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_not_called()
+
+    def test_artwork_api_failure_stops_lookups_but_keeps_all_results(self):
+        self.channels.get_channels_list.return_value = {
+            '1': {'id': '1', 'name': 'One', 'archive': True, 'archive_days': 14},
+        }
+        self.search.return_value = [
+            {'channel_id': '1', 'title': title, 'startts': 1000000000,
+             'endts': 1000003600, 'start': title, 'stop': 'stop'}
+            for title in ('First', 'Second')]
+        self.archive.API.return_value.call_api.return_value = {'err': 'unavailable'}
+        cached = {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
+        self.antik_cache.get.side_effect = [(False, None), (True, cached)]
+        self.archive.search_archive('Archive', query='Film')
+        self.assertEqual(self.plugin.addDirectoryItem.call_count, 2)
+        self.archive.API.return_value.call_api.assert_called_once()
+        self.assertEqual(self.antik_cache.get.call_count, 2)
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with(cached)
+        self.antik_cache.put.assert_not_called()
+        self.gui.Dialog.return_value.notification.assert_not_called()
+        self.xbmc.log.assert_called_once()
+
+
+class ArtworkCacheTests(unittest.TestCase):
+    def test_persistent_cache_expires_after_fifteen_days(self):
+        module = load_module('test_artwork_cache', LIB / 'artwork_cache.py')
+        key = ('antik_images', 'channel', 'start', 'Film')
+        art = {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / 'cache.sqlite')
+            with patch.object(module.time, 'time', return_value=1000000):
+                with module.ArtworkCache(path) as cache:
+                    cache.put(key, art)
+            with patch.object(module.time, 'time', return_value=1000000 + 15 * 86400 - 1):
+                with module.ArtworkCache(path) as cache:
+                    self.assertEqual(cache.get(key), (True, art))
+            with patch.object(module.time, 'time', return_value=1000000 + 15 * 86400):
+                with module.ArtworkCache(path) as cache:
+                    self.assertEqual(cache.get(key), (False, None))
+
+
+class ApiTimeoutTests(unittest.TestCase):
+    def test_timeout_is_optional_for_existing_callers(self):
+        requests = MagicMock()
+        modules = {
+            'xbmc': MagicMock(), 'xbmcaddon': MagicMock(), 'requests': requests,
+            'resources.lib.utils': types.SimpleNamespace(ua='browser', get_api_url=lambda: 'https://api.webtv.sk/'),
+        }
+        with patch.dict(sys.modules, modules):
+            api = load_module('test_api', LIB / 'api.py').API()
+            api.call_api('program/detail', 'post', {}, {'x': 1})
+            self.assertNotIn('timeout', requests.post.call_args.kwargs)
+            api.call_api('program/detail', 'post', {}, {'x': 1}, timeout=10)
+            self.assertEqual(requests.post.call_args.kwargs['timeout'], 10)
+
 
 class ArchiveSearchRouterTests(unittest.TestCase):
     def test_remote_query_and_empty_query_reach_search(self):
@@ -179,6 +292,7 @@ class ArchiveSearchRouterTests(unittest.TestCase):
             'resources.lib.utils': MagicMock(), 'resources.lib.session': MagicMock(),
             'resources.lib.channels': MagicMock(), 'resources.lib.live': MagicMock(),
             'resources.lib.archive': archive, 'resources.lib.stream': MagicMock(),
+            'requests': MagicMock(),
             'resources.lib.settings': MagicMock(), 'resources.lib.iptvsc': MagicMock(),
         }
         with patch.dict(sys.modules, modules):

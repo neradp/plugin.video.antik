@@ -9,16 +9,17 @@ class API:
     def __init__(self):
         self.headers = {'User-Agent' : ua, 'Accept' : '*/*', 'Content-type' : 'application/json;charset=UTF-8'} 
 
-    def call_api(self, api, method, cookies, data = None):
+    def call_api(self, api, method, cookies, data = None, timeout = None):
         url = get_api_url() + api
         addon = xbmcaddon.Addon()
         if addon.getSetting('log_request_url') == 'true':
             xbmc.log('Antik TV > ' + str(url))
+        options = {'timeout' : timeout} if timeout is not None else {}
         try:
             if method == 'get':
-                response = requests.get(url = url, cookies = cookies, headers = self.headers)
+                response = requests.get(url = url, cookies = cookies, headers = self.headers, **options)
             elif method == 'post':
-                response = requests.post(url = url, json = data, cookies = cookies, headers = self.headers)
+                response = requests.post(url = url, json = data, cookies = cookies, headers = self.headers, **options)
             try:
                 data = response.json()
             except Exception as e:
