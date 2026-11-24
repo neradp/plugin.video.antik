@@ -62,7 +62,11 @@ def router(paramstring):
         elif params['action'] == 'list_program':
             list_program(id = params['id'], day_min = params['day_min'], label = params['label'])
         elif params['action'] == 'play_archive':
-            play_archive(id = params['id'], start = params['start'], stop = params['stop'])
+            if 'metadata' in params:
+                play_archive(id = params['id'], start = params['start'], stop = params['stop'],
+                             metadata = params['metadata'])
+            else:
+                play_archive(id = params['id'], start = params['start'], stop = params['stop'])
         elif params['action'] == 'download_archive':
             play_archive(id = params['id'], start = params['start'], stop = params['stop'],
                          download = True, title = params.get('title', 'Antik archive'))

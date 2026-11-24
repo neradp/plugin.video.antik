@@ -4,6 +4,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
+import json
     
 from datetime import date, datetime, timedelta
 import time
@@ -88,7 +89,10 @@ def search_archive(label, query = None):
                 list_item.setArt(antik_art)
             list_item.setProperty('IsPlayable', 'true')
             list_item.setContentLookup(False)
-            url = get_url(action = 'play_archive', id = epg['channel_id'], start = epg['start'], stop = epg['stop'])
+            metadata = {'title' : epg['title'], 'description' : epg.get('description') or '',
+                        'genres' : epg.get('genres') or [], 'art' : antik_art or {}}
+            url = get_url(action = 'play_archive', id = epg['channel_id'], start = epg['start'],
+                          stop = epg['stop'], metadata = json.dumps(metadata, ensure_ascii = False))
             add_download_menu(list_item, epg, addon)
             xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)

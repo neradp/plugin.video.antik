@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import tempfile
 import types
@@ -152,7 +153,10 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertEqual(list(self.search.call_args.args[0]), ['1'])
         self.assertEqual(self.search.call_args.args[1], 'film')
         args = self.plugin.addDirectoryItem.call_args.args
-        self.assertEqual(args[1], {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
+        params = args[1].copy()
+        metadata = json.loads(params.pop('metadata'))
+        self.assertEqual(params, {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
+        self.assertEqual(metadata, {'title': 'Film', 'description': '', 'genres': [], 'art': {}})
         self.assertFalse(args[3])
         args[2].setProperty.assert_called_with('IsPlayable', 'true')
 
@@ -177,6 +181,19 @@ class ArchiveSearchUiTests(unittest.TestCase):
             self.assertEqual(params, {'action': ['download_archive'], 'id': ['1'],
                                       'start': ['start+01:00'], 'stop': ['stop'],
                                       'title': ['Film, (Život) & spol.']})
+
+    def test_search_playback_url_contains_epg_and_artwork(self):
+        self.channels.get_channels_list.return_value = {'1': {'id': '1', 'name': 'One'}}
+        self.search.return_value = [{
+            'channel_id': '1', 'title': 'Film & život', 'description': 'Popis relácie',
+            'genres': ['film'], 'startts': 1000000000, 'endts': 1000003600,
+            'start': 'start', 'stop': 'stop',
+        }]
+        with patch.object(self.archive.ProgramArtwork, 'get', return_value={'poster': 'https://example.test/cover.jpg'}):
+            self.archive.search_archive('Archive', 'Film')
+        metadata = json.loads(self.plugin.addDirectoryItem.call_args.args[1]['metadata'])
+        self.assertEqual(metadata, {'title': 'Film & život', 'description': 'Popis relácie',
+                                    'genres': ['film'], 'art': {'poster': 'https://example.test/cover.jpg'}})
 
     def test_archive_channel_folder_uses_logo(self):
         self.channels.get_channels_list.return_value = {
@@ -515,6 +532,10 @@ class ArchiveSearchRouterTests(unittest.TestCase):
             main.router('action=download_archive&id=1&start=a&stop=b&title=Film%2C+%C5%BDivot')
             modules['resources.lib.stream'].play_archive.assert_called_once_with(
                 id='1', start='a', stop='b', download=True, title='Film, Život')
+            modules['resources.lib.stream'].play_archive.reset_mock()
+            main.router('action=play_archive&id=1&start=a&stop=b&metadata=%7B%22title%22%3A%22Film%22%7D')
+            modules['resources.lib.stream'].play_archive.assert_called_once_with(
+                id='1', start='a', stop='b', metadata='{"title":"Film"}')
 
 
 if __name__ == '__main__':

@@ -39,7 +39,7 @@ class ArchiveDownloadTests(unittest.TestCase):
             'resources.lib.api': types.SimpleNamespace(API=lambda: self.api),
             'resources.lib.session': types.SimpleNamespace(Session=lambda: self.session),
             'resources.lib.channels': types.SimpleNamespace(Channels=lambda: channels),
-            'resources.lib.epg': types.SimpleNamespace(get_channel_epg=MagicMock()),
+            'resources.lib.epg': types.SimpleNamespace(get_channel_epg=MagicMock(), epg_listitem=MagicMock()),
             'resources.lib.quality': types.SimpleNamespace(apply_to_listitem=MagicMock()),
             'resources.lib.utils': types.SimpleNamespace(
                 get_api_url=lambda: 'https://example.test/', get_isa_version=lambda: 22,
@@ -48,6 +48,10 @@ class ArchiveDownloadTests(unittest.TestCase):
         self.modules_patch = patch.dict(sys.modules, modules)
         self.modules_patch.start()
         self.addCleanup(self.modules_patch.stop)
+        epg_spec = importlib.util.spec_from_file_location('test_archive_epg', LIB / 'epg.py')
+        self.epg = importlib.util.module_from_spec(epg_spec)
+        epg_spec.loader.exec_module(self.epg)
+        sys.modules['resources.lib.epg'].epg_listitem = self.epg.epg_listitem
         spec = importlib.util.spec_from_file_location('test_archive_stream', LIB / 'stream.py')
         self.stream = importlib.util.module_from_spec(spec)
         with patch.object(sys, 'argv', ['plugin://plugin.video.antik', '1']):
@@ -81,6 +85,38 @@ class ArchiveDownloadTests(unittest.TestCase):
         self.xbmc.executebuiltin.assert_not_called()
         self.plugin.endOfDirectory.assert_called_once_with(1, succeeded=False)
         self.gui.Dialog.return_value.notification.assert_called_once()
+
+    def test_archive_metadata_is_applied_to_the_resolved_item(self):
+        metadata = {'title': 'Film & život', 'description': 'Popis relácie',
+                    'genres': ['film', 'drama'], 'art': {'poster': 'https://example.test/cover.jpg'}}
+        self.addons.Addon.return_value.getSettingBool.return_value = False
+        self.stream.play_archive('channel', 'start', 'stop', metadata=json.dumps(metadata))
+        item = self.gui.ListItem.return_value
+        tag = item.getVideoInfoTag.return_value
+        tag.setTitle.assert_called_once_with(metadata['title'])
+        tag.setPlot.assert_called_once_with(metadata['description'])
+        tag.setGenres.assert_called_once_with(metadata['genres'])
+        item.setArt.assert_called_once_with(metadata['art'])
+        self.plugin.setResolvedUrl.assert_called_once_with(1, True, item)
+
+    def test_invalid_archive_metadata_is_logged_without_blocking_playback(self):
+        self.addons.Addon.return_value.getSettingBool.return_value = False
+        self.stream.play_archive('channel', 'start', 'stop', metadata='{"title": []}')
+        self.xbmc.log.assert_called_once()
+        self.gui.ListItem.return_value.getVideoInfoTag.assert_not_called()
+        self.plugin.setResolvedUrl.assert_called_once()
+
+    def test_archive_metadata_supports_older_kodi(self):
+        self.stream.get_kodi_version = lambda: 19
+        self.epg.get_kodi_version = lambda: 19
+        self.addons.Addon.return_value.getSettingBool.return_value = False
+        metadata = {'title': 'Film', 'description': 'Popis', 'genres': ['film'], 'art': {}}
+        self.stream.play_archive('channel', 'start', 'stop', metadata=json.dumps(metadata))
+        item = self.gui.ListItem.return_value
+        item.setInfo.assert_any_call('video', {'title': 'Film'})
+        item.setInfo.assert_any_call('video', {'plot': 'Popis'})
+        item.setInfo.assert_any_call('video', {'genre': ['film']})
+        item.setArt.assert_not_called()
 
     def test_long_archive_uses_stream_minus_epg_duration(self):
         with patch.object(self.stream.ArchiveStartPlayer, 'wait') as wait:

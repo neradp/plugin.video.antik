@@ -15,7 +15,7 @@ import json
 
 from resources.lib.session import Session
 from resources.lib.api import API
-from resources.lib.epg import get_channel_epg
+from resources.lib.epg import get_channel_epg, epg_listitem
 from resources.lib.utils import get_api_url, get_isa_version, get_kodi_version, ua
 from resources.lib.channels import Channels
 from resources.lib.quality import apply_to_listitem as apply_quality
@@ -130,7 +130,7 @@ def play_live(id):
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300218), xbmcgui.NOTIFICATION_ERROR, 5000)
 
 
-def play_archive(id, start, stop, download = False, title = 'Antik archive'):
+def play_archive(id, start, stop, download = False, title = 'Antik archive', metadata = None):
     kodi = get_kodi_version()
     addon = xbmcaddon.Addon()
     session = Session()
@@ -151,6 +151,27 @@ def play_archive(id, start, stop, download = False, title = 'Antik archive'):
             xbmcplugin.endOfDirectory(_handle, succeeded = True)
             return
         list_item = xbmcgui.ListItem(path = url + '|' + headers)
+        if metadata is not None:
+            try:
+                info = json.loads(metadata)
+                if (not isinstance(info, dict) or not isinstance(info.get('title'), str)
+                        or not isinstance(info.get('description'), str)
+                        or not isinstance(info.get('genres'), list)
+                        or not all(isinstance(genre, str) for genre in info['genres'])
+                        or not isinstance(info.get('art'), dict)
+                        or not all(isinstance(key, str) and isinstance(value, str)
+                                   for key, value in info['art'].items())):
+                    raise ValueError('invalid metadata fields')
+            except (TypeError, ValueError) as error:
+                xbmc.log('Antik TV > Invalid archive metadata: ' + str(error), xbmc.LOGWARNING)
+            else:
+                epg_listitem(list_item, info, None)
+                if kodi >= 20:
+                    list_item.getVideoInfoTag().setTitle(info['title'])
+                else:
+                    list_item.setInfo('video', {'title' : info['title']})
+                if info['art']:
+                    list_item.setArt(info['art'])
         if 'radio' not in channels_list[id] or channels_list[id]['radio'] == 0:
             list_item.setProperty('inputstream', 'inputstream.adaptive')
             list_item.setProperty('inputstream.adaptive.manifest_headers', headers)
