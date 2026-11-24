@@ -179,7 +179,8 @@ def play_archive(id, start, stop, download = False, title = 'Antik archive', met
             if kodi < 21:
                 list_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
         start_player = None
-        if addon.getSettingBool('archive_start_16'):
+        resume_requested = len(sys.argv) > 3 and sys.argv[3] == 'resume:true'
+        if addon.getSettingBool('archive_start_16') and not resume_requested:
             try:
                 start_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
                 stop_time = datetime.fromisoformat(stop.replace('Z', '+00:00'))

@@ -130,6 +130,21 @@ class ArchiveDownloadTests(unittest.TestCase):
         player.seekTime.assert_called_once_with(570.0)
         self.plugin.setResolvedUrl.assert_called_once()
 
+    def test_resume_request_does_not_override_kodi_resume(self):
+        with patch.object(sys, 'argv', ['plugin://plugin.video.antik', '1', '?action=play_archive', 'resume:true']):
+            self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00', '2026-11-23T13:40:00+01:00')
+        self.assertEqual(self.players, [])
+        self.plugin.setResolvedUrl.assert_called_once()
+
+    def test_non_resume_request_still_uses_estimated_start(self):
+        with patch.object(sys, 'argv', ['plugin://plugin.video.antik', '1', '?action=play_archive', 'resume:false']):
+            with patch.object(self.stream.ArchiveStartPlayer, 'wait') as wait:
+                self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00', '2026-11-23T13:40:00+01:00')
+        wait.assert_called_once()
+        self.players[0].onAVStarted()
+        self.players[0].wait()
+        self.players[0].seekTime.assert_called_once_with(570.0)
+
     def test_short_archive_uses_stream_minus_epg_duration(self):
         for minutes in (5, 15):
             with self.subTest(minutes=minutes):
