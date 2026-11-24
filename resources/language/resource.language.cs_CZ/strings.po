@@ -139,6 +139,10 @@ msgctxt "#300112"
 msgid "Archív"
 msgstr "Archiv"
 
+msgctxt "#300113"
+msgid "Vyhľadať v archíve"
+msgstr "Vyhledat v archivu"
+
 # hlasky
 
 msgctxt "#300200"
@@ -216,6 +220,14 @@ msgstr "Název skupiny je už použitý"
 msgctxt "#300218"
 msgid "Problém pri prehraní streamu"
 msgstr "Problém při přehrání streamu"
+
+msgctxt "#300219"
+msgid "Chyba pri vyhľadávaní v archíve"
+msgstr "Chyba při vyhledávání v archivu"
+
+msgctxt "#300220"
+msgid "Zadajte názov na vyhľadanie"
+msgstr "Zadejte název pro vyhledání"
 
 msgctxt "#300312"
 msgid "Nastav adresár pre playlist a EPG!"

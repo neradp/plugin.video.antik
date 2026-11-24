@@ -28,6 +28,6 @@ class API:
                 xbmc.log('Antik TV > ' + str(data))
             return data
         except Exception as e:
-            xbmc.log('Antik TV > ' + addon.getLocalizedString(300204) + str(url) + ': ' + e.reason)
-            return { 'err' : e.reason }  
+            xbmc.log('Antik TV > ' + addon.getLocalizedString(300204) + str(url) + ': ' + str(e))
+            return { 'err' : str(e) }
 

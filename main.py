@@ -12,7 +12,7 @@ from resources.lib.session import Session
 from resources.lib.channels import Channels, manage_channels, list_channels_edit, list_channels_list_backups, edit_channel, delete_channel, change_channels_numbers
 from resources.lib.channels import list_channels_groups, add_channel_group, edit_channel_group, edit_channel_group_list_channels, edit_channel_group_add_channel, edit_channel_group_add_all_channels, edit_channel_group_delete_channel, select_channel_group, delete_channel_group
 from resources.lib.live import list_live
-from resources.lib.archive import list_archive, list_archive_days, list_program
+from resources.lib.archive import list_archive, list_archive_days, list_program, search_archive
 from resources.lib.stream import play_live, play_archive, play_catchup
 from resources.lib.settings import list_settings, list_devices, remove_device
 from resources.lib.iptvsc import generate_playlist, generate_epg
@@ -53,6 +53,9 @@ def router(paramstring):
 
         elif params['action'] == 'list_archive':
             list_archive(label = params['label'])
+        elif params['action'] == 'search_archive':
+            search_params = dict(parse_qsl(paramstring, keep_blank_values = True))
+            search_archive(label = params.get('label', xbmcaddon.Addon().getLocalizedString(300113)), query = search_params.get('query'))
         elif params['action'] == 'list_archive_days':
             list_archive_days(id = params['id'], days = params['days'], label = params['label'])
         elif params['action'] == 'list_program':

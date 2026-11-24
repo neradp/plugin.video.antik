@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import xbmc
 import xbmcaddon
 
 from resources.lib.session import Session
@@ -6,7 +7,7 @@ from resources.lib.channels import Channels
 from resources.lib.api import API
 from resources.lib.utils import get_kodi_version
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import time
 
 def get_live_epg():
@@ -45,12 +46,56 @@ def get_channel_epg(id, from_ts, to_ts):
     response = api.call_api(api = 'epg/channels', data = post, method = 'post', cookies = session.get_cookies())    
     if len(response) > 0 and 'epg' in response[0]:
         for item in response[0]['epg']:
-            startts = int(datetime.fromisoformat(item['Start']).timestamp())
-            endts = int(datetime.fromisoformat(item['Stop']).timestamp())
-            epg.append({'id' : item['SeriesID'], 'title' : item['Title'], 'channel_id' : item['Channel'], 'description' : item['Description'], 'startts' : startts, 'endts' : endts, 'start' : item['Start'], 'stop' : item['Stop'], 'genres' : item['Genres']})
+            epg.append(parse_epg_item(item))
         return epg_api(data = epg, key = 'startts')
     else:
         return {}
+
+def parse_epg_item(item):
+    startts = int(datetime.fromisoformat(item['Start']).timestamp())
+    endts = int(datetime.fromisoformat(item['Stop']).timestamp())
+    return {'id' : item['SeriesID'], 'title' : item['Title'], 'channel_id' : item['Channel'], 'description' : item['Description'], 'startts' : startts, 'endts' : endts, 'start' : item['Start'], 'stop' : item['Stop'], 'genres' : item['Genres']}
+
+def search_archive_epg(channels, query, now):
+    if not channels:
+        return []
+    archive_days = {channel_id : int(channel.get('archive_days', 14)) for channel_id, channel in channels.items()}
+    session = Session()
+    api = API()
+    cookies = session.get_cookies()
+    results = []
+    seen = set()
+    query = query.casefold()
+    for day in range(max(archive_days.values()) + 1):
+        epg_date = (date.fromtimestamp(now) - timedelta(days = day)).isoformat()
+        channel_ids = [channel_id for channel_id, days in archive_days.items() if days >= day]
+        for offset in range(0, len(channel_ids), 50):
+            batch = channel_ids[offset:offset + 50]
+            post = {'date' : epg_date, 'offset' : 0, 'limit' : 200, 'filter' : batch, 'search' : ''}
+            response = api.call_api(api = 'epg/channels', data = post, method = 'post', cookies = cookies)
+            if not isinstance(response, list):
+                raise ValueError('Invalid archive EPG response')
+            for channel in response:
+                if not isinstance(channel, dict) or ('epg' in channel and not isinstance(channel['epg'], list)):
+                    raise ValueError('Invalid archive EPG channel')
+                for item in channel.get('epg', []):
+                    title = item.get('Title') if isinstance(item, dict) else None
+                    if not isinstance(title, (str, int, float)):
+                        xbmc.log('Antik TV > Invalid EPG title in archive search', xbmc.LOGWARNING)
+                        continue
+                    title = str(title)
+                    if query not in title.casefold():
+                        continue
+                    epg = parse_epg_item(item)
+                    epg['title'] = title
+                    channel_id = str(epg['channel_id'])
+                    key = (channel_id, epg['start'], epg['stop'])
+                    if (channel_id in batch and
+                            now - max(archive_days[channel_id], 1) * 24 * 60 * 60 < epg['endts'] < now
+                            and key not in seen):
+                        seen.add(key)
+                        results.append(epg)
+    return sorted(results, key = lambda item: item['startts'], reverse = True)
 
 def get_channels_epg(channels):
     addon = xbmcaddon.Addon()

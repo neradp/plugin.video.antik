@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
@@ -10,7 +11,7 @@ from urllib.parse import quote
 
 from resources.lib.utils import get_url, day_translation, day_translation_short
 from resources.lib.channels import Channels 
-from resources.lib.epg import get_channel_epg, epg_listitem
+from resources.lib.epg import get_channel_epg, epg_listitem, search_archive_epg
 
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
@@ -20,6 +21,10 @@ def list_archive(label):
     xbmcplugin.setPluginCategory(_handle, label)
     channels = Channels()
     channels_list = channels.get_channels_list('channel_number')
+    search_label = addon.getLocalizedString(300113)
+    list_item = xbmcgui.ListItem(label = search_label)
+    url = get_url(action = 'search_archive', label = label + ' / ' + search_label)
+    xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     for number in sorted(channels_list.keys()):  
         if 'archive' not in channels_list[number] or channels_list[number]['archive'] == True or 'archive_days' not in channels_list[number] or channels_list[number]['archive_days'] != 0:
             if 'archive_days' not in channels_list[number]:
@@ -29,6 +34,46 @@ def list_archive(label):
                 list_item.setArt({'icon' : 'http://' + addon.getSetting('picons_server_ip') + ':' + addon.getSetting('picons_server_port') + '/picons/' + quote(channels_list[number]['name'])}) 
             url = get_url(action='list_archive_days', id = channels_list[number]['id'], days = channels_list[number]['archive_days'], label = label + ' / ' + channels_list[number]['name'])  
             xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
+
+def search_archive(label, query = None):
+    addon = xbmcaddon.Addon()
+    if query is None:
+        keyboard = xbmc.Keyboard('', addon.getLocalizedString(300113))
+        keyboard.doModal()
+        if not keyboard.isConfirmed():
+            xbmcplugin.endOfDirectory(_handle, succeeded = False, cacheToDisc = False)
+            return
+        query = keyboard.getText()
+    query = query.strip()
+    if not query:
+        xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300220), xbmcgui.NOTIFICATION_ERROR, 5000)
+        xbmcplugin.endOfDirectory(_handle, succeeded = False, cacheToDisc = False)
+        return
+    xbmcplugin.setPluginCategory(_handle, label + ' / ' + query)
+    xbmcplugin.setContent(_handle, 'twshows')
+    channels_list = Channels().get_channels_list('id')
+    channels = {str(channel['id']) : channel for channel in channels_list.values()
+                if 'archive' not in channel or channel['archive'] == True
+                or 'archive_days' not in channel or channel['archive_days'] != 0}
+    try:
+        results = search_archive_epg(channels, query, time.time())
+    except (ValueError, KeyError, TypeError) as error:
+        xbmc.log('Antik TV > Archive search failed: ' + str(error), xbmc.LOGERROR)
+        xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300219), xbmcgui.NOTIFICATION_ERROR, 5000)
+        xbmcplugin.endOfDirectory(_handle, succeeded = False, cacheToDisc = False)
+        return
+    for epg in results:
+        start = datetime.fromtimestamp(epg['startts'])
+        end = datetime.fromtimestamp(epg['endts'])
+        channel = channels[str(epg['channel_id'])]
+        item_label = (day_translation_short[start.strftime('%w')] + ' ' + start.strftime('%d.%m %H:%M') +
+                      ' - ' + end.strftime('%H:%M') + ' | ' + channel['name'] + ' | ' + epg['title'])
+        list_item = epg_listitem(xbmcgui.ListItem(label = item_label), epg, None)
+        list_item.setProperty('IsPlayable', 'true')
+        list_item.setContentLookup(False)
+        url = get_url(action = 'play_archive', id = epg['channel_id'], start = epg['start'], stop = epg['stop'])
+        xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
 def list_archive_days(id, label, days):
