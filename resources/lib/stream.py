@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import sys
 import base64
+import threading
+import time
 
 import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
 
+from datetime import datetime
 from urllib.parse import urlencode
 import json
 
@@ -19,6 +22,41 @@ from resources.lib.quality import apply_to_listitem as apply_quality
 
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
+
+class ArchiveStartPlayer(xbmc.Player):
+    def __init__(self, url, epg_duration):
+        super().__init__()
+        self.url = url
+        self.epg_duration = epg_duration
+        self.started = threading.Event()
+
+    def onAVStarted(self):
+        self.started.set()
+
+    def wait(self):
+        monitor = xbmc.Monitor()
+        deadline = time.monotonic() + 30
+        previous_duration = None
+        while time.monotonic() < deadline:
+            if self.started.is_set():
+                try:
+                    if self.getPlayingFile().split('|', 1)[0] != self.url:
+                        xbmc.log('Antik TV > Archive start skipped: a different item is playing', xbmc.LOGWARNING)
+                        return
+                    stream_duration = self.getTotalTime()
+                    if stream_duration > 0 and stream_duration == previous_duration:
+                        offset = max(0, stream_duration - self.epg_duration)
+                        if offset > 0:
+                            self.seekTime(offset)
+                        xbmc.log('Antik TV > Estimated archive start: {:.1f} seconds'.format(offset), xbmc.LOGINFO)
+                        return
+                    previous_duration = stream_duration
+                except RuntimeError as error:
+                    xbmc.log('Antik TV > Archive start seek failed: ' + str(error), xbmc.LOGERROR)
+                    return
+            if monitor.waitForAbort(0.2):
+                return
+        xbmc.log('Antik TV > Archive start seek timed out', xbmc.LOGWARNING)
 
 def play_catchup(id, start_ts, end_ts):
     start_ts = int(start_ts)
@@ -119,8 +157,22 @@ def play_archive(id, start, stop, download = False, title = 'Antik archive'):
             list_item.setProperty('inputstream.adaptive.stream_headers', headers)
             if kodi < 21:
                 list_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
+        start_player = None
+        if addon.getSettingBool('archive_start_16'):
+            try:
+                start_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                stop_time = datetime.fromisoformat(stop.replace('Z', '+00:00'))
+                duration = (stop_time - start_time).total_seconds()
+                if duration <= 0:
+                    raise ValueError('archive end is not after start')
+            except (TypeError, ValueError) as error:
+                xbmc.log('Antik TV > Cannot determine archive duration: ' + str(error), xbmc.LOGWARNING)
+            else:
+                start_player = ArchiveStartPlayer(url, duration)
         list_item.setContentLookup(False)       
         xbmcplugin.setResolvedUrl(_handle, True, list_item)
+        if start_player:
+            start_player.wait()
     else:
         xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300218), xbmcgui.NOTIFICATION_ERROR, 5000)
         if download:

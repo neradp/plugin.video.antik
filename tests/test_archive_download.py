@@ -15,6 +15,19 @@ LIB = Path(__file__).resolve().parents[1] / 'resources' / 'lib'
 class ArchiveDownloadTests(unittest.TestCase):
     def setUp(self):
         self.xbmc, self.gui, self.plugin, self.addons = (MagicMock() for _ in range(4))
+        self.addons.Addon.return_value.getSettingBool.return_value = True
+        self.xbmc.Monitor.return_value.waitForAbort.return_value = False
+        self.players = []
+        players = self.players
+
+        class FakePlayer:
+            def __init__(self):
+                self.getPlayingFile = MagicMock(return_value='https://example.test/archive/playShow/fake-show|headers')
+                self.getTotalTime = MagicMock(return_value=6570.0)
+                self.seekTime = MagicMock()
+                players.append(self)
+
+        self.xbmc.Player = FakePlayer
         self.session = MagicMock()
         self.session.get_cookies.return_value = {'session': 'fake-cookie', 'XSRF-TOKEN': 'fake-xsrf'}
         self.api = MagicMock()
@@ -68,6 +81,78 @@ class ArchiveDownloadTests(unittest.TestCase):
         self.xbmc.executebuiltin.assert_not_called()
         self.plugin.endOfDirectory.assert_called_once_with(1, succeeded=False)
         self.gui.Dialog.return_value.notification.assert_called_once()
+
+    def test_long_archive_uses_stream_minus_epg_duration(self):
+        with patch.object(self.stream.ArchiveStartPlayer, 'wait') as wait:
+            self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00', '2026-11-23T13:40:00+01:00')
+        wait.assert_called_once()
+        player = self.players[0]
+        player.getTotalTime.side_effect = [0, 6570.0, 6570.0]
+        player.seekTime.assert_not_called()
+        player.onAVStarted()
+        player.wait()
+        player.seekTime.assert_called_once_with(570.0)
+        self.plugin.setResolvedUrl.assert_called_once()
+
+    def test_short_archive_uses_stream_minus_epg_duration(self):
+        for minutes in (5, 15):
+            with self.subTest(minutes=minutes):
+                with patch.object(self.stream.ArchiveStartPlayer, 'wait'):
+                    self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00',
+                                             '2026-11-23T12:{:02d}:00+01:00'.format(minutes))
+                player = self.players[-1]
+                player.getTotalTime.return_value = minutes * 60 + 570
+                player.onAVStarted()
+                player.wait()
+                player.seekTime.assert_called_once_with(570)
+
+    def test_disabled_setting_starts_at_beginning(self):
+        self.addons.Addon.return_value.getSettingBool.return_value = False
+        self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00', '2026-11-23T13:00:00+01:00')
+        self.assertEqual(self.players, [])
+
+    def test_invalid_archive_duration_is_logged_and_starts_at_beginning(self):
+        self.stream.play_archive('channel', 'not-a-date', '2026-11-23T13:00:00+01:00')
+        self.xbmc.log.assert_called_once()
+        self.assertEqual(self.players, [])
+
+    def test_older_kodi_seeks_after_playback_starts(self):
+        self.stream.get_kodi_version = lambda: 20
+        with patch.object(self.stream.ArchiveStartPlayer, 'wait'):
+            self.stream.play_archive('channel', '2026-11-23T12:00:00Z', '2026-11-23T13:00:00Z')
+        self.players[0].onAVStarted()
+        self.players[0].wait()
+        self.players[0].seekTime.assert_called_once_with(2970.0)
+
+    def test_does_not_seek_a_different_item(self):
+        player = self.stream.ArchiveStartPlayer('https://example.test/archive/playShow/fake-show', 6000)
+        player.getPlayingFile.return_value = 'https://example.test/other-video'
+        player.onAVStarted()
+        player.wait()
+        player.seekTime.assert_not_called()
+        self.xbmc.log.assert_called_once()
+
+    def test_does_not_seek_when_stream_is_not_longer_than_epg(self):
+        player = self.stream.ArchiveStartPlayer('https://example.test/archive/playShow/fake-show', 6000)
+        player.getTotalTime.return_value = 5900
+        player.onAVStarted()
+        player.wait()
+        player.seekTime.assert_not_called()
+
+    def test_does_not_seek_when_duration_never_becomes_available(self):
+        player = self.stream.ArchiveStartPlayer('https://example.test/archive/playShow/fake-show', 6000)
+        player.getTotalTime.return_value = 0
+        player.onAVStarted()
+        with patch.object(self.stream.time, 'monotonic', side_effect=[0, 0, 31]):
+            player.wait()
+        player.seekTime.assert_not_called()
+        self.xbmc.log.assert_called_once()
+
+    def test_download_is_not_offset(self):
+        self.stream.play_archive('channel', '2026-11-23T12:00:00+01:00', '2026-11-23T13:00:00+01:00',
+                                 download=True)
+        self.gui.ListItem.assert_not_called()
+        self.addons.Addon.return_value.getSettingBool.assert_not_called()
 
 
 if __name__ == '__main__':

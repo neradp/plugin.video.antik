@@ -5,6 +5,10 @@ msgstr ""
 
 # nastaveni
 
+msgctxt "#30060"
+msgid "Odhadnúť začiatok prehrávania archívu podľa EPG"
+msgstr "Odhadnout začátek přehrávání archivu podle EPG"
+
 msgctxt "#30054"
 msgid "Aktualizovať logá staníc"
 msgstr "Aktualizovat loga stanic"

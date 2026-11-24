@@ -9,6 +9,7 @@
 	</category>
 	<category label="30010">
                 <setting label="30011" type="bool" id="hide_settings" default="false"/>
+                <setting label="30060" type="bool" id="archive_start_16" default="true"/>
                 <setting label="Povolit rádia" type="bool" id="enable_radio" default="false"/>
                 <setting label="30054" type="action" action="RunPlugin(plugin://plugin.video.antik?action=update_station_logos)"/>
                 <setting label="30053" type="lsep"/>
