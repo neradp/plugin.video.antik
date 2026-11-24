@@ -111,11 +111,12 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'xbmcaddon': self.addon,
             'xbmcvfs': types.SimpleNamespace(translatePath=lambda path: 'profile'),
             'resources.lib.utils': types.SimpleNamespace(
-                get_url=lambda **kwargs: kwargs, day_translation={},
+                get_url=lambda **kwargs: kwargs, day_translation={str(i): str(i) for i in range(7)},
                 day_translation_short={str(i): str(i) for i in range(7)}),
             'resources.lib.channels': types.SimpleNamespace(Channels=lambda: self.channels),
             'resources.lib.api': MagicMock(), 'resources.lib.session': MagicMock(),
             'resources.lib.artwork_cache': types.SimpleNamespace(ArtworkCache=self.cache),
+            'resources.lib.station_logos': types.SimpleNamespace(channel_logo=MagicMock(return_value=None)),
             'resources.lib.epg': types.SimpleNamespace(
                 get_channel_epg=MagicMock(),
                 epg_listitem=lambda item, epg, logo: item,
@@ -152,6 +153,46 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertEqual(args[1], {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
         self.assertFalse(args[3])
         args[2].setProperty.assert_called_with('IsPlayable', 'true')
+
+    def test_archive_channel_folder_uses_logo(self):
+        self.channels.get_channels_list.return_value = {
+            1: {'id': '1', 'name': 'One', 'archive': True, 'archive_days': 14},
+        }
+        self.gui.ListItem.side_effect = [MagicMock(), MagicMock()]
+        self.archive.channel_logo.return_value = 'station.png'
+        self.archive.list_archive('Archive')
+        search, channel = self.plugin.addDirectoryItem.call_args_list
+        search.args[2].setArt.assert_not_called()
+        channel.args[2].setArt.assert_called_once_with({'icon': 'station.png', 'thumb': 'station.png'})
+        self.assertTrue(channel.args[3])
+
+    def test_archive_days_use_channel_logo(self):
+        channel = {'id': '1', 'name': 'One'}
+        self.channels.get_channels_list.return_value = {'1': channel}
+        self.archive.channel_logo.return_value = 'station.png'
+        items = [MagicMock() for _ in range(3)]
+        self.gui.ListItem.side_effect = items
+        self.archive.list_archive_days('1', 'Archive / One', '2')
+        self.channels.get_channels_list.assert_called_once_with('id')
+        self.archive.channel_logo.assert_called_once_with(channel, self.addon.Addon.return_value)
+        calls = self.plugin.addDirectoryItem.call_args_list
+        self.assertEqual(len(calls), 3)
+        for day, (item, call) in enumerate(zip(items, calls)):
+            item.setArt.assert_called_once_with({'icon': 'station.png', 'thumb': 'station.png'})
+            self.assertEqual(call.args[1]['action'], 'list_program')
+            self.assertEqual(call.args[1]['id'], '1')
+            self.assertEqual(call.args[1]['day_min'], day)
+            self.assertTrue(call.args[3])
+
+    def test_archive_days_without_channel_or_logo(self):
+        for channels in ({}, {'1': {'id': '1', 'name': 'One'}}):
+            with self.subTest(channels=channels):
+                self.channels.get_channels_list.return_value = channels
+                self.archive.channel_logo.return_value = None
+                self.gui.ListItem.reset_mock()
+                self.archive.list_archive_days('1', 'Archive / One', '0')
+                self.gui.ListItem.return_value.setArt.assert_not_called()
+        self.archive.channel_logo.assert_called_once()
 
     def test_cancel_and_errors(self):
         self.xbmc.Keyboard.return_value.isConfirmed.return_value = False
@@ -247,6 +288,68 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.antik_cache.put.assert_not_called()
         self.gui.Dialog.return_value.notification.assert_not_called()
         self.xbmc.log.assert_called_once()
+
+
+class StationLogoTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.logo_dir = Path(self.temp.name) / 'resources' / 'stations' / 'png'
+        self.logo_dir.mkdir(parents=True)
+        for channel in ('stv_1', 'joj_cinema'):
+            (self.logo_dir / (channel + '.png')).write_bytes(b'png')
+        self.xbmc, self.gui, self.plugin, self.addon = (MagicMock() for _ in range(4))
+        self.settings = {'use_picons_server': 'false'}
+        self.addon.Addon.return_value.getSetting.side_effect = lambda name: self.settings.get(name, '')
+        self.addon.Addon.return_value.getAddonInfo.return_value = self.temp.name
+        self.channels = MagicMock()
+        self.epg = MagicMock()
+        self.modules_patch = patch.dict(sys.modules, {
+            'xbmc': self.xbmc, 'xbmcgui': self.gui, 'xbmcplugin': self.plugin,
+            'xbmcaddon': self.addon,
+            'xbmcvfs': types.SimpleNamespace(translatePath=lambda path: path),
+            'resources.lib.channels': types.SimpleNamespace(Channels=lambda: self.channels),
+            'resources.lib.epg': types.SimpleNamespace(
+                get_live_epg=self.epg, epg_listitem=lambda list_item, epg, logo: list_item),
+            'resources.lib.utils': types.SimpleNamespace(
+                get_url=lambda **kwargs: kwargs, get_kodi_version=lambda: 20),
+        })
+        self.modules_patch.start()
+        self.logos = load_module('test_station_logos', LIB / 'station_logos.py')
+
+    def tearDown(self):
+        self.modules_patch.stop()
+
+    def test_local_logo_missing_logo_and_picons_priority(self):
+        addon = self.addon.Addon()
+        channel = {'id': 'stv_1', 'name': 'STV One'}
+        path = self.logos.channel_logo(channel, addon)
+        self.assertEqual(Path(path), self.logo_dir / 'stv_1.png')
+        self.assertIsNone(self.logos.channel_logo({'id': 'nonexistent', 'name': 'Missing'}, addon))
+        self.assertIsNone(self.logos.channel_logo({'id': '../bad', 'name': 'Bad'}, addon))
+        self.xbmc.log.assert_called_once()
+        self.settings.update(use_picons_server='true', picons_server_ip='localhost', picons_server_port='80')
+        self.assertEqual(self.logos.channel_logo(channel, addon), 'http://localhost:80/picons/STV%20One')
+
+    def test_live_logos_with_and_without_epg(self):
+        with patch.dict(sys.modules, {'resources.lib.station_logos': self.logos}):
+            live = load_module('test_live', LIB / 'live.py')
+        live._handle = 1
+        self.channels.get_channels_list.return_value = {
+            1: {'id': 'stv_1', 'name': 'First'},
+            2: {'id': 'joj_cinema', 'name': 'Second'},
+            3: {'id': 'missing', 'name': 'Third'},
+        }
+        self.epg.return_value = {'stv_1': {'title': 'Film', 'startts': 1000000000, 'endts': 1000003600}}
+        items = [MagicMock(), MagicMock(), MagicMock()]
+        self.gui.ListItem.side_effect = items
+        live.list_live('Live')
+        for item, ident in zip(items[:2], ('stv_1', 'joj_cinema')):
+            path = str(self.logo_dir / (ident + '.png'))
+            item.setArt.assert_called_once_with({'icon': path, 'thumb': path})
+            item.setProperty.assert_called_once_with('IsPlayable', 'true')
+        items[2].setArt.assert_not_called()
+        self.assertEqual(self.plugin.addDirectoryItem.call_count, 3)
 
 
 class ArtworkCacheTests(unittest.TestCase):

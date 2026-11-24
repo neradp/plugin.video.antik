@@ -10,7 +10,7 @@ import xbmcvfs
     
 from datetime import date, datetime, timedelta
 import time
-from urllib.parse import quote, urlsplit
+from urllib.parse import urlsplit
 
 from resources.lib.utils import get_url, day_translation, day_translation_short
 from resources.lib.channels import Channels 
@@ -18,6 +18,7 @@ from resources.lib.epg import get_channel_epg, epg_listitem, search_archive_epg
 from resources.lib.api import API
 from resources.lib.session import Session
 from resources.lib.artwork_cache import ArtworkCache
+from resources.lib.station_logos import channel_logo
 
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
@@ -36,8 +37,9 @@ def list_archive(label):
             if 'archive_days' not in channels_list[number]:
                 channels_list[number]['archive_days'] = 7
             list_item = xbmcgui.ListItem(label=channels_list[number]['name'])
-            if addon.getSetting('use_picons_server') == 'true':
-                list_item.setArt({'icon' : 'http://' + addon.getSetting('picons_server_ip') + ':' + addon.getSetting('picons_server_port') + '/picons/' + quote(channels_list[number]['name'])}) 
+            logo = channel_logo(channels_list[number], addon)
+            if logo:
+                list_item.setArt({'icon' : logo, 'thumb' : logo})
             url = get_url(action='list_archive_days', id = channels_list[number]['id'], days = channels_list[number]['archive_days'], label = label + ' / ' + channels_list[number]['name'])  
             xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
@@ -152,6 +154,8 @@ def search_archive(label, query = None):
 
 def list_archive_days(id, label, days):
     xbmcplugin.setPluginCategory(_handle, label)
+    channel = Channels().get_channels_list('id').get(id)
+    logo = channel_logo(channel, xbmcaddon.Addon()) if channel else None
     for i in range (int(days) + 1):
         day = date.today() - timedelta(days = i)
         if i == 0:
@@ -164,6 +168,8 @@ def list_archive_days(id, label, days):
             den_label = day_translation_short[day.strftime('%w')] + ' ' + day.strftime('%d.%m')
             den = day_translation[day.strftime('%w')] + ' ' + day.strftime('%d.%m.%Y')
         list_item = xbmcgui.ListItem(label = den)
+        if logo:
+            list_item.setArt({'icon' : logo, 'thumb' : logo})
         url = get_url(action='list_program', id = id, day_min = i, label = label + ' / ' + den_label)  
         xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
