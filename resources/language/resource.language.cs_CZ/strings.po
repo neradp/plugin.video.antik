@@ -5,6 +5,30 @@ msgstr ""
 
 # nastaveni
 
+msgctxt "#30054"
+msgid "Aktualizovať logá staníc"
+msgstr "Aktualizovat loga stanic"
+
+msgctxt "#30055"
+msgid "ImageMagick nebol nájdený. Nainštalujte ho alebo pridajte magick do PATH."
+msgstr "ImageMagick nebyl nalezen. Nainstalujte jej nebo přidejte magick do PATH."
+
+msgctxt "#30056"
+msgid "Logá aktualizované: {0}, chyby: {1}"
+msgstr "Loga aktualizována: {0}, chyby: {1}"
+
+msgctxt "#30057"
+msgid "Aktualizácia log zrušená. Aktualizované: {0}, chyby: {1}"
+msgstr "Aktualizace log zrušena. Aktualizováno: {0}, chyby: {1}"
+
+msgctxt "#30058"
+msgid "Aktualizácia log staníc"
+msgstr "Aktualizace log stanic"
+
+msgctxt "#30059"
+msgid "Nepodarilo sa aktualizovať logá; podrobnosti sú v logu Kodi."
+msgstr "Nepodařilo se aktualizovat loga; podrobnosti jsou v logu Kodi."
+
 msgctxt "#30000"
 msgid "Prihlásenie"
 msgstr "Přihlášení"

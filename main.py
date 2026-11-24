@@ -16,6 +16,7 @@ from resources.lib.archive import list_archive, list_archive_days, list_program,
 from resources.lib.stream import play_live, play_archive, play_catchup
 from resources.lib.settings import list_settings, list_devices, remove_device
 from resources.lib.iptvsc import generate_playlist, generate_epg
+from resources.lib.logo_updater import update_station_logos
 
 if len(sys.argv) > 1:
     _handle = int(sys.argv[1])
@@ -116,6 +117,9 @@ def router(paramstring):
         elif params['action'] == 'reset_session':
            session = Session()
            session.remove_session()
+
+        elif params['action'] == 'update_station_logos':
+            update_station_logos()
 
         elif params['action'] == 'generate_playlist':
             if 'output_file' in params:

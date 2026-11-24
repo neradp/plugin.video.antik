@@ -452,6 +452,7 @@ class ArchiveSearchRouterTests(unittest.TestCase):
             'resources.lib.archive': archive, 'resources.lib.stream': MagicMock(),
             'requests': MagicMock(),
             'resources.lib.settings': MagicMock(), 'resources.lib.iptvsc': MagicMock(),
+            'resources.lib.logo_updater': MagicMock(),
         }
         with patch.dict(sys.modules, modules):
             main = load_module('test_main', LIB.parents[1] / 'main.py')
@@ -461,6 +462,8 @@ class ArchiveSearchRouterTests(unittest.TestCase):
             archive.search_archive.assert_called_with(label='Search', query='')
             main.router('action=search_archive&label=Archive')
             archive.search_archive.assert_called_with(label='Archive', query=None)
+            main.router('action=update_station_logos')
+            modules['resources.lib.logo_updater'].update_station_logos.assert_called_once()
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@
 	<category label="30010">
                 <setting label="30011" type="bool" id="hide_settings" default="false"/>
                 <setting label="Povolit rádia" type="bool" id="enable_radio" default="false"/>
+                <setting label="30054" type="action" action="RunPlugin(plugin://plugin.video.antik?action=update_station_logos)"/>
                 <setting label="30053" type="lsep"/>
                 <setting label="30049" type="select" id="stream_quality" lvalues="30050|30051|30052" default="0"/>
                 <setting label="Picons Server" type="lsep"/>
