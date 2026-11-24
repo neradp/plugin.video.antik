@@ -119,15 +119,17 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'resources.lib.station_logos': types.SimpleNamespace(channel_logo=MagicMock(return_value=None)),
             'resources.lib.epg': types.SimpleNamespace(
                 get_channel_epg=MagicMock(),
-                epg_listitem=lambda item, epg, logo: item,
+                epg_listitem=lambda list_item, epg, logo: list_item,
                 search_archive_epg=self.search),
         }
         self.modules_patch = patch.dict(sys.modules, modules)
         self.modules_patch.start()
+        self.artwork = load_module('test_program_artwork', LIB / 'program_artwork.py')
+        sys.modules['resources.lib.program_artwork'] = self.artwork
         self.archive = load_module('test_archive', LIB / 'archive.py')
         self.archive._handle = 1
-        self.archive.API.return_value.call_api.return_value = {'images': []}
-        self.makedirs_patch = patch.object(self.archive.os, 'makedirs')
+        self.artwork.API.return_value.call_api.return_value = {'images': []}
+        self.makedirs_patch = patch.object(self.artwork.os, 'makedirs')
         self.makedirs_patch.start()
 
     def tearDown(self):
@@ -194,6 +196,22 @@ class ArchiveSearchUiTests(unittest.TestCase):
                 self.gui.ListItem.return_value.setArt.assert_not_called()
         self.archive.channel_logo.assert_called_once()
 
+    def test_archive_program_artwork_is_attached(self):
+        now = datetime.now().timestamp()
+        program = {'title': 'Film', 'startts': now - 3600, 'endts': now - 60,
+                   'channel_id': '1', 'start': 'start', 'stop': 'stop'}
+        self.archive.get_channel_epg.return_value = {1: program}
+        fanart = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
+        self.antik_cache.get.return_value = (True, {'fanart': fanart})
+        self.archive.list_program('1', '0', 'Archive / One / Today')
+        item = self.plugin.addDirectoryItem.call_args.args[2]
+        item.setArt.assert_called_once_with({'fanart': fanart})
+        item.setProperty.assert_called_once_with('IsPlayable', 'true')
+        self.assertEqual(self.plugin.addDirectoryItem.call_args.args[1],
+                         {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
+        self.artwork.API.assert_not_called()
+        self.antik_cache.close.assert_called_once()
+
     def test_cancel_and_errors(self):
         self.xbmc.Keyboard.return_value.isConfirmed.return_value = False
         self.archive.search_archive('Archive')
@@ -230,18 +248,18 @@ class ArchiveSearchUiTests(unittest.TestCase):
         }]
         cover = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
         landscape = 'https://extendedepg-gonet.antik.sk/programme_icon/2'
-        self.archive.API.return_value.call_api.return_value = {
+        self.artwork.API.return_value.call_api.return_value = {
             'images': [{'type': 'cover', 'url': cover}, {'type': 'poster', 'url': landscape}],
         }
         self.archive.search_archive('Archive', query='Film')
         item = self.plugin.addDirectoryItem.call_args.args[2]
         item.setArt.assert_called_once_with({'poster': cover, 'thumb': cover, 'fanart': landscape})
         item.setProperty.assert_called_with('IsPlayable', 'true')
-        call = self.archive.API.return_value.call_api.call_args.kwargs
+        call = self.artwork.API.return_value.call_api.call_args.kwargs
         self.assertEqual(call['api'], 'program/detail')
         self.assertEqual(call['data'], {
             'channel_id': '1', 'program': {'start': 'start'}, 'includes': ['images']})
-        self.assertEqual(call['cookies'], self.archive.Session.return_value.get_cookies.return_value)
+        self.assertEqual(call['cookies'], self.artwork.Session.return_value.get_cookies.return_value)
         self.assertEqual(call['timeout'], 10)
         self.antik_cache.close.assert_called_once()
 
@@ -256,11 +274,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.antik_cache.get.return_value = (True, {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
                                                     'thumb': 'https://extendedepg-gonet.antik.sk/programme_icon/1'})
         self.archive.search_archive('Archive', query='Film')
-        self.archive.API.return_value.call_api.assert_not_called()
+        self.artwork.API.return_value.call_api.assert_not_called()
         self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once()
 
         self.antik_cache.get.return_value = (False, None)
-        self.archive.API.return_value.call_api.return_value = {
+        self.artwork.API.return_value.call_api.return_value = {
             'images': [{'type': 'cover', 'url': 'https://example.com/image.jpg'},
                        {'type': 'poster', 'url': 'http://extendedepg-gonet.antik.sk/image.jpg'},
                        {'type': 'poster', 'url': 'https://extendedepg-gonet.antik.sk/image.jpg?token=secret'}],
@@ -277,12 +295,12 @@ class ArchiveSearchUiTests(unittest.TestCase):
             {'channel_id': '1', 'title': title, 'startts': 1000000000,
              'endts': 1000003600, 'start': title, 'stop': 'stop'}
             for title in ('First', 'Second')]
-        self.archive.API.return_value.call_api.return_value = {'err': 'unavailable'}
+        self.artwork.API.return_value.call_api.return_value = {'err': 'unavailable'}
         cached = {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
         self.antik_cache.get.side_effect = [(False, None), (True, cached)]
         self.archive.search_archive('Archive', query='Film')
         self.assertEqual(self.plugin.addDirectoryItem.call_count, 2)
-        self.archive.API.return_value.call_api.assert_called_once()
+        self.artwork.API.return_value.call_api.assert_called_once()
         self.assertEqual(self.antik_cache.get.call_count, 2)
         self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with(cached)
         self.antik_cache.put.assert_not_called()
@@ -304,6 +322,9 @@ class StationLogoTests(unittest.TestCase):
         self.addon.Addon.return_value.getAddonInfo.return_value = self.temp.name
         self.channels = MagicMock()
         self.epg = MagicMock()
+        self.artwork = MagicMock()
+        self.artwork.__enter__.return_value = self.artwork
+        self.artwork.get.return_value = {}
         self.modules_patch = patch.dict(sys.modules, {
             'xbmc': self.xbmc, 'xbmcgui': self.gui, 'xbmcplugin': self.plugin,
             'xbmcaddon': self.addon,
@@ -313,6 +334,7 @@ class StationLogoTests(unittest.TestCase):
                 get_live_epg=self.epg, epg_listitem=lambda list_item, epg, logo: list_item),
             'resources.lib.utils': types.SimpleNamespace(
                 get_url=lambda **kwargs: kwargs, get_kodi_version=lambda: 20),
+            'resources.lib.program_artwork': types.SimpleNamespace(ProgramArtwork=lambda addon: self.artwork),
         })
         self.modules_patch.start()
         self.logos = load_module('test_station_logos', LIB / 'station_logos.py')
@@ -341,18 +363,51 @@ class StationLogoTests(unittest.TestCase):
             3: {'id': 'missing', 'name': 'Third'},
         }
         self.epg.return_value = {'stv_1': {'title': 'Film', 'startts': 1000000000, 'endts': 1000003600}}
+        fanart = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
+        self.artwork.get.return_value = {'fanart': fanart}
         items = [MagicMock(), MagicMock(), MagicMock()]
         self.gui.ListItem.side_effect = items
         live.list_live('Live')
         for item, ident in zip(items[:2], ('stv_1', 'joj_cinema')):
             path = str(self.logo_dir / (ident + '.png'))
-            item.setArt.assert_called_once_with({'icon': path, 'thumb': path})
+            item.setArt.assert_any_call({'icon': path, 'thumb': path})
             item.setProperty.assert_called_once_with('IsPlayable', 'true')
+        items[0].setArt.assert_any_call({'fanart': fanart})
+        self.artwork.get.assert_called_once_with(self.epg.return_value['stv_1'])
         items[2].setArt.assert_not_called()
         self.assertEqual(self.plugin.addDirectoryItem.call_count, 3)
 
 
 class ArtworkCacheTests(unittest.TestCase):
+    def test_artwork_cache_is_shared_across_listings(self):
+        cache_module = load_module('real_artwork_cache', LIB / 'artwork_cache.py')
+        api = MagicMock()
+        url = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
+        api.call_api.return_value = {'images': [{'type': 'poster', 'url': url}]}
+        api_factory = MagicMock(return_value=api)
+        session_factory = MagicMock()
+        modules = {
+            'xbmc': MagicMock(),
+            'xbmcvfs': types.SimpleNamespace(translatePath=lambda path: path),
+            'resources.lib.api': types.SimpleNamespace(API=api_factory),
+            'resources.lib.session': types.SimpleNamespace(Session=session_factory),
+            'resources.lib.artwork_cache': cache_module,
+        }
+        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, modules):
+            addon = MagicMock()
+            addon.getAddonInfo.return_value = directory
+            module = load_module('real_program_artwork', LIB / 'program_artwork.py')
+            program = {'channel_id': '1', 'start': 'start', 'title': 'Film'}
+            for _ in range(3):
+                with module.ProgramArtwork(addon) as artwork:
+                    self.assertEqual(artwork.get(program)['fanart'], url)
+            api.call_api.assert_called_once()
+            api_factory.assert_called_once()
+            session_factory.assert_called_once()
+            with module.ProgramArtwork(addon) as artwork:
+                self.assertEqual(artwork.get(dict(program, start='other'))['fanart'], url)
+            self.assertEqual(api.call_api.call_count, 2)
+
     def test_persistent_cache_expires_after_fifteen_days(self):
         module = load_module('test_artwork_cache', LIB / 'artwork_cache.py')
         key = ('antik_images', 'channel', 'start', 'Film')

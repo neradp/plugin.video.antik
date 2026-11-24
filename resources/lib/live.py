@@ -8,6 +8,7 @@ from datetime import datetime
 from resources.lib.channels import Channels 
 from resources.lib.epg import get_live_epg, epg_listitem
 from resources.lib.station_logos import channel_logo
+from resources.lib.program_artwork import ProgramArtwork
 from resources.lib.utils import get_url, get_kodi_version
 
 if len(sys.argv) > 1:
@@ -21,25 +22,29 @@ def list_live(label):
     channels = Channels()
     channels_list = channels.get_channels_list('channel_number')
     epg = get_live_epg()
-    for num in sorted(channels_list.keys()):
-        logo = channel_logo(channels_list[num], addon)
-        if channels_list[num]['id'] in epg:
-            epg_item = epg[channels_list[num]['id']]
-            list_item = xbmcgui.ListItem(label = channels_list[num]['name'] + ' | ' + epg_item['title'] + ' | ' + datetime.fromtimestamp(epg_item['startts']).strftime('%H:%M') + ' - ' + datetime.fromtimestamp(epg_item['endts']).strftime('%H:%M'))
-            list_item = epg_listitem(list_item = list_item, epg = epg_item, logo = None)
-        else:
-            list_item = xbmcgui.ListItem(label = channels_list[num]['name'])
-        if logo:
-            list_item.setArt({'icon' : logo, 'thumb' : logo})
-        if kodi_version >= 20:
-            infotag = list_item.getVideoInfoTag()
-            infotag.setMediaType('movie')
-        else:
-            list_item.setInfo('video', {'mediatype' : 'movie'})   
-        list_item.setContentLookup(False)          
-        list_item.setProperty('IsPlayable', 'true')
-        url = get_url(action='play_live', id = channels_list[num]['id'], title = channels_list[num]['name'])
-        xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
+    with ProgramArtwork(addon) as artwork:
+        for num in sorted(channels_list.keys()):
+            logo = channel_logo(channels_list[num], addon)
+            if channels_list[num]['id'] in epg:
+                epg_item = epg[channels_list[num]['id']]
+                list_item = xbmcgui.ListItem(label = channels_list[num]['name'] + ' | ' + epg_item['title'] + ' | ' + datetime.fromtimestamp(epg_item['startts']).strftime('%H:%M') + ' - ' + datetime.fromtimestamp(epg_item['endts']).strftime('%H:%M'))
+                list_item = epg_listitem(list_item = list_item, epg = epg_item, logo = None)
+                antik_art = artwork.get(epg_item)
+                if antik_art:
+                    list_item.setArt(antik_art)
+            else:
+                list_item = xbmcgui.ListItem(label = channels_list[num]['name'])
+            if logo:
+                list_item.setArt({'icon' : logo, 'thumb' : logo})
+            if kodi_version >= 20:
+                infotag = list_item.getVideoInfoTag()
+                infotag.setMediaType('movie')
+            else:
+                list_item.setInfo('video', {'mediatype' : 'movie'})
+            list_item.setContentLookup(False)
+            list_item.setProperty('IsPlayable', 'true')
+            url = get_url(action='play_live', id = channels_list[num]['id'], title = channels_list[num]['name'])
+            xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
 
