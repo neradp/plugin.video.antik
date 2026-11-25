@@ -288,14 +288,21 @@ class ArchiveSearchUiTests(unittest.TestCase):
                    'channel_id': '1', 'start': 'start', 'stop': 'stop'}
         self.archive.get_channel_epg.return_value = {1: program}
         fanart = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
-        self.antik_cache.get.return_value = (True, {'fanart': fanart})
+        poster = 'https://extendedepg-gonet.antik.sk/programme_icon/2'
+        self.antik_cache.get.return_value = (True, {'poster': poster, 'thumb': poster, 'fanart': fanart})
+        channel = {'id': '1', 'name': 'One'}
+        self.channels.get_channels_list.return_value = {'1': channel}
+        self.archive.channel_logo.return_value = 'station.png'
         self.archive.list_program('1', '0', 'Archive / One / Today')
         item = self.plugin.addDirectoryItem.call_args.args[2]
-        item.setArt.assert_called_once_with({'fanart': fanart})
+        item.setArt.assert_called_once_with({
+            'poster': poster, 'thumb': poster, 'fanart': fanart,
+        })
         item.setProperty.assert_called_once_with('IsPlayable', 'true')
         self.assertEqual(self.plugin.addDirectoryItem.call_args.args[1],
                          {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
         self.artwork.API.assert_not_called()
+        self.archive.channel_logo.assert_called_once_with(channel, self.addon.Addon.return_value)
         self.antik_cache.close.assert_called_once()
 
     def test_archive_program_uses_default_fanart_when_artwork_is_missing(self):
@@ -304,8 +311,14 @@ class ArchiveSearchUiTests(unittest.TestCase):
                    'channel_id': '1', 'start': 'start', 'stop': 'stop'}
         self.archive.get_channel_epg.return_value = {1: program}
         self.antik_cache.get.return_value = (True, {})
+        self.channels.get_channels_list.return_value = {
+            '1': {'id': '1', 'name': 'One'},
+        }
+        self.archive.channel_logo.return_value = 'station.png'
         self.archive.list_program('1', '0', 'Archive / One / Today')
         self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
+            'icon': 'station.png',
+            'thumb': 'station.png',
             'fanart': os.path.join('addon-path', 'fanart.jpg'),
         })
 

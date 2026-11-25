@@ -29,7 +29,8 @@ this fork.
 
 - **Artwork:** Use original Antik-themed icons in the main menu and archive
   search, keep the fanart background while navigating, and fall back to it when
-  programme artwork is unavailable.
+  programme artwork is unavailable. Archive programmes without a thumbnail
+  use their station logo.
 - **Archive search:** Search programme titles across visible channels and their
   configured archive retention. If retention is unknown, the search uses
   14 days. Results can also be requested through Kodi's JSON-RPC interface.

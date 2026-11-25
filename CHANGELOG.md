@@ -5,6 +5,7 @@
 - Refresh main-menu icons and fanart with original artwork.
 - Add archive-search icon and fanart fallback while preserving programme artwork.
 - Keep plugin fanart available while navigating and use it when programme artwork is missing.
+- Use the station logo for archive programmes without their own thumbnail.
 
 ## v0.0.2 - 2026-11-25
 

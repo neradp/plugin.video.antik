@@ -141,6 +141,8 @@ def list_archive_days(id, label, days):
 def list_program(id, day_min, label):
     addon = xbmcaddon.Addon()
     fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
+    channel = Channels().get_channels_list('id').get(id)
+    logo = channel_logo(channel, addon) if channel else None
     label = label.replace(addon.getLocalizedString(300112) + ' /','')
     xbmcplugin.setPluginCategory(_handle, label)
     xbmcplugin.setContent(_handle, 'twshows')
@@ -162,6 +164,12 @@ def list_program(id, day_min, label):
                 antik_art = artwork.get(epg[key])
                 item_art = {'fanart': fanart}
                 item_art.update(antik_art)
+                if not item_art.get('thumb'):
+                    thumb = item_art.get('poster') or logo
+                    if thumb:
+                        item_art['thumb'] = thumb
+                if logo and not item_art.get('poster') and not item_art.get('icon'):
+                    item_art['icon'] = logo
                 if not item_art.get('fanart'):
                     item_art['fanart'] = fanart
                 list_item.setArt(item_art)
