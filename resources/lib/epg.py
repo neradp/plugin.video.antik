@@ -165,7 +165,7 @@ def epg_listitem(list_item, epg, logo):
         infotag = list_item.getVideoInfoTag()
         infotag.setMediaType('movie')
     else:
-        list_item.setInfo('video', {'mediatype' : 'movie'})   
+        list_item.setInfo('video', {'mediatype' : 'movie'})
     if logo is not None:
         list_item.setArt({'icon' : logo}) 
     if isinstance(epg.get('description'), str) and epg['description']:

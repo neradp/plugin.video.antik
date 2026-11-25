@@ -124,6 +124,13 @@ class ArchiveSearchTests(unittest.TestCase):
         self.epg.epg_listitem(list_item, {'description': None}, None)
         list_item.getVideoInfoTag.return_value.setPlot.assert_not_called()
 
+    def test_epg_listitem_sets_movie_media_type(self):
+        list_item = MagicMock()
+        self.epg.epg_listitem(list_item, {'description': 'A programme'}, None)
+        list_item.getVideoInfoTag.return_value.setMediaType.assert_called_once_with('movie')
+        list_item.getVideoInfoTag.return_value.setPlaycount.assert_not_called()
+        list_item.getVideoInfoTag.return_value.setPlot.assert_called_once_with('A programme')
+
 
 class ArchiveSearchUiTests(unittest.TestCase):
     def setUp(self):
@@ -176,6 +183,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'channel_id': '1', 'title': 'Film', 'startts': 1000000000,
             'endts': 1000003600, 'start': 'start', 'stop': 'stop',
         }]
+        self.archive.channel_logo.return_value = 'station.png'
         self.archive.search_archive('Archive')
         self.assertEqual(list(self.search.call_args.args[0]), ['1'])
         self.assertEqual(self.search.call_args.args[1], 'film')
@@ -187,10 +195,13 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertFalse(args[3])
         args[2].setProperty.assert_called_with('IsPlayable', 'true')
         self.assertEqual(args[2].setArt.call_args.args[0], {
-            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
-            'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'icon': 'station.png',
+            'thumb': 'station.png',
             'fanart': ARCHIVE_FANART,
         })
+        self.archive.channel_logo.assert_called_once_with(
+            {'id': '1', 'name': 'One', 'archive': False, 'archive_days': 2},
+            self.addon.Addon.return_value)
 
     def test_download_menu_in_search_and_day_program(self):
         from urllib.parse import parse_qs, urlencode, urlsplit
@@ -221,12 +232,21 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'genres': ['film'], 'startts': 1000000000, 'endts': 1000003600,
             'start': 'start', 'stop': 'stop',
         }]
-        with patch.object(self.archive.ProgramArtwork, 'get', return_value={'poster': 'https://example.test/cover.jpg'}):
+        self.archive.channel_logo.return_value = 'station.png'
+        art = {'poster': 'https://example.test/cover.jpg', 'thumb': 'https://example.test/cover.jpg'}
+        with patch.object(self.archive.ProgramArtwork, 'get', return_value=art):
             self.archive.search_archive('Archive', 'Film')
+        start = datetime.fromtimestamp(1000000000)
+        end = datetime.fromtimestamp(1000003600)
+        expected_label = '{}   {} {} {} - {}'.format(
+            'Film & život', self.archive.day_translation_short[start.strftime('%w')],
+            start.strftime('%d.%m'), start.strftime('%H:%M'), end.strftime('%H:%M'))
+        self.assertEqual(self.gui.ListItem.call_args.kwargs['label'], expected_label)
         metadata = json.loads(self.plugin.addDirectoryItem.call_args.args[1]['metadata'])
         self.assertEqual(metadata, {'title': 'Film & život', 'description': 'Popis relácie',
-                                    'genres': ['film'], 'art': {'poster': 'https://example.test/cover.jpg'}})
+                                    'genres': ['film'], 'art': art})
         item_art = self.plugin.addDirectoryItem.call_args.args[2].setArt.call_args.args[0]
+        self.assertEqual(item_art['icon'], 'station.png')
         self.assertEqual(item_art['poster'], 'https://example.test/cover.jpg')
         self.assertEqual(item_art['thumb'], 'https://example.test/cover.jpg')
         self.assertEqual(item_art['fanart'], ARCHIVE_FANART)
@@ -250,38 +270,64 @@ class ArchiveSearchUiTests(unittest.TestCase):
         })
         self.assertTrue(channel.args[3])
 
-    def test_archive_days_use_channel_logo(self):
+    def test_archive_days_use_special_and_weekday_calendar_icons(self):
+        fixed_today = datetime(2026, 1, 5).date()
         channel = {'id': '1', 'name': 'One'}
         self.channels.get_channels_list.return_value = {'1': channel}
         self.archive.channel_logo.return_value = 'station.png'
-        items = [MagicMock() for _ in range(3)]
+        items = [MagicMock() for _ in range(9)]
         self.gui.ListItem.side_effect = items
-        self.archive.list_archive_days('1', 'Archive / One', '2')
+        short_days = {'0': 'Ne', '1': 'Po', '2': 'Ut', '3': 'St',
+                      '4': 'Št', '5': 'Pi', '6': 'So'}
+        with patch.object(self.archive, 'date') as date_class, \
+                patch.object(self.archive, 'day_translation_short', short_days):
+            date_class.today.return_value = fixed_today
+            self.archive.list_archive_days('1', 'Archive / One', '8')
+        calls = self.plugin.addDirectoryItem.call_args_list
+        self.assertEqual(len(calls), 9)
         self.channels.get_channels_list.assert_called_once_with('id')
         self.archive.channel_logo.assert_called_once_with(channel, self.addon.Addon.return_value)
-        calls = self.plugin.addDirectoryItem.call_args_list
-        self.assertEqual(len(calls), 3)
-        for day, (item, call) in enumerate(zip(items, calls)):
+        expected_labels = (
+            'Dnes', 'Včera', '03.01', '02.01', '01.01',
+            '31.12', '30.12', '29.12', '28.12',
+        )
+        self.assertEqual(
+            [call.kwargs['label'] for call in self.gui.ListItem.call_args_list],
+            list(expected_labels))
+        expected_breadcrumbs = (
+            'Dnes', 'Včera', 'So 03.01', 'Pi 02.01', 'Št 01.01',
+            'St 31.12', 'Ut 30.12', 'Po 29.12', 'Ne 28.12',
+        )
+        icon_names = (
+            'archive_today.png', 'archive_yesterday.png', 'archive_saturday.png',
+            'archive_friday.png', 'archive_thursday.png', 'archive_wednesday.png',
+            'archive_tuesday.png', 'archive_monday.png', 'archive_sunday.png',
+        )
+        for day, (item, call, icon_name) in enumerate(zip(items, calls, icon_names)):
+            icon = os.path.join('addon-path', 'resources', 'images', icon_name)
             item.setArt.assert_called_once_with({
-                'icon': 'station.png', 'thumb': 'station.png',
+                'icon': icon, 'thumb': icon, 'poster': 'station.png',
                 'fanart': ARCHIVE_FANART,
             })
             self.assertEqual(call.args[1]['action'], 'list_program')
             self.assertEqual(call.args[1]['id'], '1')
             self.assertEqual(call.args[1]['day_min'], day)
+            self.assertEqual(
+                call.args[1]['label'],
+                'Archive / One / ' + expected_breadcrumbs[day])
             self.assertTrue(call.args[3])
 
-    def test_archive_days_without_channel_or_logo(self):
-        for channels in ({}, {'1': {'id': '1', 'name': 'One'}}):
-            with self.subTest(channels=channels):
-                self.channels.get_channels_list.return_value = channels
-                self.archive.channel_logo.return_value = None
-                self.gui.ListItem.reset_mock()
-                self.archive.list_archive_days('1', 'Archive / One', '0')
-                self.gui.ListItem.return_value.setArt.assert_called_once_with({
-                    'fanart': ARCHIVE_FANART,
-                })
-        self.archive.channel_logo.assert_called_once()
+    def test_archive_day_uses_calendar_thumbnail_without_station_logo(self):
+        self.channels.get_channels_list.return_value = {
+            '1': {'id': '1', 'name': 'One'},
+        }
+        with patch.object(self.archive, 'date') as date_class:
+            date_class.today.return_value = datetime(2026, 1, 5).date()
+            self.archive.list_archive_days('1', 'Archive / One', '0')
+        icon = os.path.join('addon-path', 'resources', 'images', 'archive_today.png')
+        self.gui.ListItem.return_value.setArt.assert_called_once_with({
+            'icon': icon, 'thumb': icon, 'poster': icon, 'fanart': ARCHIVE_FANART,
+        })
 
     def test_archive_program_artwork_is_attached(self):
         now = datetime.now().timestamp()
@@ -296,6 +342,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.archive.channel_logo.return_value = 'station.png'
         self.archive.list_program('1', '0', 'Archive / One / Today')
         item = self.plugin.addDirectoryItem.call_args.args[2]
+        start_time = datetime.fromtimestamp(program['startts']).strftime('%H:%M')
+        end_time = datetime.fromtimestamp(program['endts']).strftime('%H:%M')
+        self.assertEqual(
+            self.gui.ListItem.call_args.kwargs['label'],
+            'Film   ' + start_time + ' - ' + end_time)
         item.setArt.assert_called_once_with({
             'poster': poster, 'thumb': poster, 'fanart': fanart,
         })
@@ -453,6 +504,8 @@ class StationLogoTests(unittest.TestCase):
         self.addon.Addon.return_value.getAddonInfo.return_value = self.temp.name
         self.channels = MagicMock()
         self.epg = MagicMock()
+        self.epg_listitem = MagicMock(
+            side_effect=lambda list_item, epg, logo: list_item)
         self.artwork = MagicMock()
         self.artwork.__enter__.return_value = self.artwork
         self.artwork.get.return_value = {}
@@ -462,7 +515,7 @@ class StationLogoTests(unittest.TestCase):
             'xbmcvfs': types.SimpleNamespace(translatePath=lambda path: path),
             'resources.lib.channels': types.SimpleNamespace(Channels=lambda: self.channels),
             'resources.lib.epg': types.SimpleNamespace(
-                get_live_epg=self.epg, epg_listitem=lambda list_item, epg, logo: list_item),
+                get_live_epg=self.epg, epg_listitem=self.epg_listitem),
             'resources.lib.utils': types.SimpleNamespace(
                 get_url=lambda **kwargs: kwargs, get_kodi_version=lambda: 20),
             'resources.lib.program_artwork': types.SimpleNamespace(ProgramArtwork=lambda addon: self.artwork),
@@ -502,6 +555,17 @@ class StationLogoTests(unittest.TestCase):
         items = [MagicMock(), MagicMock(), MagicMock()]
         self.gui.ListItem.side_effect = items
         live.list_live('Live')
+        start_time = datetime.fromtimestamp(1000000000).strftime('%H:%M')
+        end_time = datetime.fromtimestamp(1000003600).strftime('%H:%M')
+        self.assertEqual(
+            [call.kwargs['label'] for call in self.gui.ListItem.call_args_list],
+            [
+                'Film   {} - {}'.format(start_time, end_time),
+                'News   {} - {}'.format(start_time, end_time),
+                'Third',
+            ])
+        self.assertEqual(self.epg_listitem.call_count, 2)
+        self.plugin.setContent.assert_called_once_with(1, 'files')
         default_fanart = str(
             Path(self.addon.Addon.return_value.getAddonInfo.return_value)
             / 'resources' / 'images' / 'live_fanart.jpg')
@@ -512,6 +576,9 @@ class StationLogoTests(unittest.TestCase):
                 path = str(self.logo_dir / (ident + '.png'))
                 art.update({'icon': path, 'thumb': path})
             item.setArt.assert_called_once_with(art)
+            item.setOverlay.assert_called_once_with(self.gui.ICON_OVERLAY_NONE)
+            item.getVideoInfoTag.return_value.setMediaType.assert_called_once_with('movie')
+            item.setInfo.assert_not_called()
             item.setProperty.assert_called_once_with('IsPlayable', 'true')
         self.assertEqual(self.artwork.get.call_count, 2)
         self.assertEqual(self.plugin.addDirectoryItem.call_count, 3)

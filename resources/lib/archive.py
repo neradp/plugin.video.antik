@@ -91,14 +91,19 @@ def search_archive(label, query = None):
             start = datetime.fromtimestamp(epg['startts'])
             end = datetime.fromtimestamp(epg['endts'])
             channel = channels[str(epg['channel_id'])]
-            item_label = (day_translation_short[start.strftime('%w')] + ' ' + start.strftime('%d.%m %H:%M') +
-                          ' - ' + end.strftime('%H:%M') + ' | ' + channel['name'] + ' | ' + epg['title'])
+            day_label = day_translation_short[start.strftime('%w')] + ' ' + start.strftime('%d.%m')
+            time_range = start.strftime('%H:%M') + ' - ' + end.strftime('%H:%M')
+            item_label = '{}   {} {}'.format(
+                epg['title'], day_label, time_range)
             list_item = epg_listitem(xbmcgui.ListItem(label = item_label), epg, None)
+            logo = channel_logo(channel, addon)
             antik_art = artwork.get(epg)
-            item_art = {'icon': search_icon}
+            item_art = {'icon': logo or search_icon}
+            if logo:
+                item_art['thumb'] = logo
             item_art.update(antik_art)
             if not item_art.get('thumb'):
-                item_art['thumb'] = item_art.get('poster') or search_icon
+                item_art['thumb'] = item_art.get('poster') or logo or search_icon
             if not item_art.get('fanart'):
                 item_art['fanart'] = fanart
             list_item.setArt(item_art)
@@ -114,26 +119,35 @@ def search_archive(label, query = None):
 
 def list_archive_days(id, label, days):
     addon = xbmcaddon.Addon()
-    fanart = os.path.join(addon.getAddonInfo('path'), 'resources', 'images', 'archive_fanart.jpg')
+    images_path = os.path.join(addon.getAddonInfo('path'), 'resources', 'images')
+    fanart = os.path.join(images_path, 'archive_fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
     channel = Channels().get_channels_list('id').get(id)
     logo = channel_logo(channel, addon) if channel else None
+    weekday_icons = (
+        'archive_monday.png', 'archive_tuesday.png', 'archive_wednesday.png',
+        'archive_thursday.png', 'archive_friday.png', 'archive_saturday.png',
+        'archive_sunday.png',
+    )
     for i in range (int(days) + 1):
         day = date.today() - timedelta(days = i)
         if i == 0:
             den_label = 'Dnes'
             den = 'Dnes'
+            icon_name = 'archive_today.png'
         elif i == 1:
             den_label = 'Včera'
             den = 'Včera'
+            icon_name = 'archive_yesterday.png'
         else:
             den_label = day_translation_short[day.strftime('%w')] + ' ' + day.strftime('%d.%m')
-            den = day_translation[day.strftime('%w')] + ' ' + day.strftime('%d.%m.%Y')
+            den = day.strftime('%d.%m')
+            icon_name = weekday_icons[day.weekday()]
         list_item = xbmcgui.ListItem(label = den)
-        item_art = {'fanart': fanart}
-        if logo:
-            item_art.update({'icon': logo, 'thumb': logo})
-        list_item.setArt(item_art)
+        icon = os.path.join(images_path, icon_name)
+        list_item.setArt({
+            'icon': icon, 'thumb': icon, 'poster': logo or icon, 'fanart': fanart,
+        })
         url = get_url(action='list_program', id = id, day_min = i, label = label + ' / ' + den_label)  
         xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
@@ -159,7 +173,10 @@ def list_program(id, day_min, label):
     with ProgramArtwork(addon) as artwork:
         for key in sorted(epg.keys(), reverse = False):
             if int(epg[key]['endts']) > int(time.mktime(datetime.now().timetuple()))-60*60*24*(int(day_min) + 1) and int(epg[key]['endts']) < int(time.mktime(datetime.now().timetuple())):
-                list_item = xbmcgui.ListItem(label = day_translation_short[datetime.fromtimestamp(epg[key]['startts']).strftime('%w')] + ' ' + datetime.fromtimestamp(epg[key]['startts']).strftime('%d.%m %H:%M') + ' - ' + datetime.fromtimestamp(epg[key]['endts']).strftime('%H:%M') + ' | ' + epg[key]['title'])
+                start_time = datetime.fromtimestamp(epg[key]['startts']).strftime('%H:%M')
+                end_time = datetime.fromtimestamp(epg[key]['endts']).strftime('%H:%M')
+                program_label = epg[key]['title'] + '   ' + start_time + ' - ' + end_time
+                list_item = xbmcgui.ListItem(label = program_label)
                 list_item = epg_listitem(list_item = list_item, epg = epg[key], logo = None)
                 antik_art = artwork.get(epg[key])
                 item_art = {'fanart': fanart}

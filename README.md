@@ -40,7 +40,10 @@ this fork.
   listings and search results, and include it in XMLTV exports. Artwork URLs
   are cached for 20 days; the first lookup or EPG generation can take longer.
 - **Station logos:** Show local channel logos in Kodi and include them in M3U
-  and XMLTV exports. A configured Picons server takes precedence.
+  and XMLTV exports. A configured Picons server takes precedence. An optional
+  [Estuary skin modification](docs/estuary-station-logos.md) displays logos
+  beside live programmes and archive search results instead of status icons,
+  and hides status icons in an individual archive day.
 - **IPTV Merge:** Provide the generated playlist and XMLTV guide as a source
   for the optional IPTV Merge add-on.
 - **Archive downloads:** Send archive programmes from the context menu to my

@@ -20,7 +20,7 @@ def list_live(label):
     addon = xbmcaddon.Addon()
     fanart = os.path.join(addon.getAddonInfo('path'), 'resources', 'images', 'live_fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
-    xbmcplugin.setContent(_handle, 'twshows')
+    xbmcplugin.setContent(_handle, 'files')
     channels = Channels()
     channels_list = channels.get_channels_list('channel_number')
     epg = get_live_epg()
@@ -29,7 +29,11 @@ def list_live(label):
             logo = channel_logo(channels_list[num], addon)
             if channels_list[num]['id'] in epg:
                 epg_item = epg[channels_list[num]['id']]
-                list_item = xbmcgui.ListItem(label = channels_list[num]['name'] + ' | ' + epg_item['title'] + ' | ' + datetime.fromtimestamp(epg_item['startts']).strftime('%H:%M') + ' - ' + datetime.fromtimestamp(epg_item['endts']).strftime('%H:%M'))
+                start_time = datetime.fromtimestamp(epg_item['startts']).strftime('%H:%M')
+                end_time = datetime.fromtimestamp(epg_item['endts']).strftime('%H:%M')
+                item_label = '{}   {} - {}'.format(
+                    epg_item['title'], start_time, end_time)
+                list_item = xbmcgui.ListItem(label = item_label)
                 list_item = epg_listitem(list_item = list_item, epg = epg_item, logo = None)
                 antik_art = artwork.get(epg_item)
                 item_art = {'fanart': fanart}
@@ -47,6 +51,7 @@ def list_live(label):
                 infotag.setMediaType('movie')
             else:
                 list_item.setInfo('video', {'mediatype' : 'movie'})
+            list_item.setOverlay(xbmcgui.ICON_OVERLAY_NONE)
             list_item.setContentLookup(False)
             list_item.setProperty('IsPlayable', 'true')
             url = get_url(action='play_live', id = channels_list[num]['id'], title = channels_list[num]['name'])
