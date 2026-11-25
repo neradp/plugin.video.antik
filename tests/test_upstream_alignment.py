@@ -163,3 +163,14 @@ class MainMenuArtworkTests(unittest.TestCase):
                 'icon': path,
                 'fanart': str(Path('addon-path') / 'fanart.jpg'),
             })
+        for query, filename in (
+                ('action=list_live&label=Live', 'live_fanart.jpg'),
+                ('action=list_archive&label=Archive', 'archive_fanart.jpg'),
+                ('action=list_archive_days&id=1&days=1&label=Archive', 'archive_fanart.jpg'),
+                ('action=list_program&id=1&day_min=0&label=Archive', 'archive_fanart.jpg'),
+                ('action=search_archive&label=Archive', 'archive_fanart.jpg')):
+            with self.subTest(query=query):
+                plugin.setPluginFanart.reset_mock()
+                module.router(query)
+                expected = str(Path('addon-path') / 'resources' / 'images' / filename)
+                plugin.setPluginFanart.assert_called_once_with(1, expected)

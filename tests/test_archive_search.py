@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 LIB = Path(__file__).resolve().parents[1] / 'resources' / 'lib'
+ARCHIVE_FANART = os.path.join('addon-path', 'resources', 'images', 'archive_fanart.jpg')
 
 
 def load_module(name, path):
@@ -188,7 +189,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertEqual(args[2].setArt.call_args.args[0], {
             'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
 
     def test_download_menu_in_search_and_day_program(self):
@@ -228,7 +229,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
         item_art = self.plugin.addDirectoryItem.call_args.args[2].setArt.call_args.args[0]
         self.assertEqual(item_art['poster'], 'https://example.test/cover.jpg')
         self.assertEqual(item_art['thumb'], 'https://example.test/cover.jpg')
-        self.assertEqual(item_art['fanart'], os.path.join('addon-path', 'fanart.jpg'))
+        self.assertEqual(item_art['fanart'], ARCHIVE_FANART)
 
     def test_archive_channel_folder_uses_logo(self):
         self.channels.get_channels_list.return_value = {
@@ -241,11 +242,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         search.args[2].setArt.assert_called_once_with({
             'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
         channel.args[2].setArt.assert_called_once_with({
             'icon': 'station.png', 'thumb': 'station.png',
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
         self.assertTrue(channel.args[3])
 
@@ -263,7 +264,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
         for day, (item, call) in enumerate(zip(items, calls)):
             item.setArt.assert_called_once_with({
                 'icon': 'station.png', 'thumb': 'station.png',
-                'fanart': os.path.join('addon-path', 'fanart.jpg'),
+                'fanart': ARCHIVE_FANART,
             })
             self.assertEqual(call.args[1]['action'], 'list_program')
             self.assertEqual(call.args[1]['id'], '1')
@@ -278,7 +279,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
                 self.gui.ListItem.reset_mock()
                 self.archive.list_archive_days('1', 'Archive / One', '0')
                 self.gui.ListItem.return_value.setArt.assert_called_once_with({
-                    'fanart': os.path.join('addon-path', 'fanart.jpg'),
+                    'fanart': ARCHIVE_FANART,
                 })
         self.archive.channel_logo.assert_called_once()
 
@@ -319,7 +320,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
             'icon': 'station.png',
             'thumb': 'station.png',
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
 
     def test_cancel_and_errors(self):
@@ -394,7 +395,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
             'thumb': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
 
         self.antik_cache.get.return_value = (False, None)
@@ -408,7 +409,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
             'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
 
     def test_artwork_api_failure_stops_lookups_but_keeps_all_results(self):
@@ -431,7 +432,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'poster': cached['poster'],
             'thumb': cached['poster'],
-            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            'fanart': ARCHIVE_FANART,
         })
         self.antik_cache.put.assert_not_called()
         self.gui.Dialog.return_value.notification.assert_not_called()
@@ -501,7 +502,9 @@ class StationLogoTests(unittest.TestCase):
         items = [MagicMock(), MagicMock(), MagicMock()]
         self.gui.ListItem.side_effect = items
         live.list_live('Live')
-        default_fanart = str(Path(self.addon.Addon.return_value.getAddonInfo.return_value) / 'fanart.jpg')
+        default_fanart = str(
+            Path(self.addon.Addon.return_value.getAddonInfo.return_value)
+            / 'resources' / 'images' / 'live_fanart.jpg')
         for item, ident, expected_fanart in zip(
                 items, ('stv_1', 'joj_cinema', 'missing'), (fanart, default_fanart, default_fanart)):
             art = {'fanart': expected_fanart}

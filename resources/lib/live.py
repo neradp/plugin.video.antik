@@ -18,7 +18,7 @@ if len(sys.argv) > 1:
 def list_live(label):
     kodi_version = get_kodi_version()
     addon = xbmcaddon.Addon()
-    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
+    fanart = os.path.join(addon.getAddonInfo('path'), 'resources', 'images', 'live_fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
     xbmcplugin.setContent(_handle, 'twshows')
     channels = Channels()

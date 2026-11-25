@@ -32,7 +32,7 @@ def list_archive(label):
     addon = xbmcaddon.Addon()    
     xbmcplugin.setPluginCategory(_handle, label)
     addon_path = addon.getAddonInfo('path')
-    fanart = os.path.join(addon_path, 'fanart.jpg')
+    fanart = os.path.join(addon_path, 'resources', 'images', 'archive_fanart.jpg')
     search_icon = os.path.join(addon_path, 'resources', 'images', 'search.png')
     channels = Channels()
     channels_list = channels.get_channels_list('channel_number')
@@ -59,7 +59,7 @@ def list_archive(label):
 def search_archive(label, query = None):
     addon = xbmcaddon.Addon()
     addon_path = addon.getAddonInfo('path')
-    fanart = os.path.join(addon_path, 'fanart.jpg')
+    fanart = os.path.join(addon_path, 'resources', 'images', 'archive_fanart.jpg')
     search_icon = os.path.join(addon_path, 'resources', 'images', 'search.png')
     if query is None:
         keyboard = xbmc.Keyboard('', addon.getLocalizedString(300113))
@@ -114,7 +114,7 @@ def search_archive(label, query = None):
 
 def list_archive_days(id, label, days):
     addon = xbmcaddon.Addon()
-    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
+    fanart = os.path.join(addon.getAddonInfo('path'), 'resources', 'images', 'archive_fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
     channel = Channels().get_channels_list('id').get(id)
     logo = channel_logo(channel, addon) if channel else None
@@ -140,7 +140,7 @@ def list_archive_days(id, label, days):
 
 def list_program(id, day_min, label):
     addon = xbmcaddon.Addon()
-    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
+    fanart = os.path.join(addon.getAddonInfo('path'), 'resources', 'images', 'archive_fanart.jpg')
     channel = Channels().get_channels_list('id').get(id)
     logo = channel_logo(channel, addon) if channel else None
     label = label.replace(addon.getLocalizedString(300112) + ' /','')

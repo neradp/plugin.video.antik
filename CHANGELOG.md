@@ -7,6 +7,8 @@
 - Keep plugin fanart available while navigating and use it when programme artwork is missing.
 - Use the station logo for archive programmes without their own thumbnail.
 - Replace Live TV and archive menu icons with original cinematic artwork.
+- Add matching section fanart for Live TV and Archive while keeping the main-menu fanart.
+- Simplify archive search to a film-strip magnifier icon.
 
 ## v0.0.2 - 2026-11-25
 

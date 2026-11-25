@@ -49,9 +49,15 @@ def main_menu():
 
 def router(paramstring):
     addon = xbmcaddon.Addon()
-    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
-    xbmcplugin.setPluginFanart(_handle, fanart)
+    addon_path = addon.getAddonInfo('path')
     params = dict(parse_qsl(paramstring))
+    if params.get('action') == 'list_live':
+        fanart = os.path.join(addon_path, 'resources', 'images', 'live_fanart.jpg')
+    elif params.get('action') in ('list_archive', 'search_archive', 'list_archive_days', 'list_program'):
+        fanart = os.path.join(addon_path, 'resources', 'images', 'archive_fanart.jpg')
+    else:
+        fanart = os.path.join(addon_path, 'fanart.jpg')
+    xbmcplugin.setPluginFanart(_handle, fanart)
     check_settings() 
     if params:
         if params['action'] == 'list_live':
