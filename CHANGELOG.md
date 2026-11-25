@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.0.4 - 2026-11-25
+
+- Fix live playback on servers that require a Referer, including JOJ, by
+  sending manifest headers through InputStream Adaptive.
+
 ## v0.0.3 - 2026-11-25
 
 - Refresh main-menu icons and fanart with original artwork.

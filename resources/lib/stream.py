@@ -98,10 +98,9 @@ def play_live(id):
             
         if uses_isa:
             apply_quality(list_item)
-            stream_headers = "Referer=https://webtv.tv&User-Agent=" + ua
+            stream_headers = urlencode({'Referer': 'https://webtv.tv', 'User-Agent': ua})
             list_item.setProperty('inputstream.adaptive.stream_headers', stream_headers)
-            if kodi < 21:
-                list_item.setProperty('inputstream.adaptive.manifest_headers', stream_headers)
+            list_item.setProperty('inputstream.adaptive.manifest_headers', stream_headers)
 
         if 'drm' in response['data']['streams'][0]:
             license_url = 'https://drm.antik.sk/widevine/key'
@@ -117,11 +116,13 @@ def play_live(id):
                 list_item.setProperty('inputstream.adaptive.license_type', 'com.widevine.alpha')
                 list_item.setProperty('inputstream.adaptive.license_key', f'{license_url}||R{{SSM}}|{drm_headers}')
 
-        headers = f"Referer=https://webtv.tv&User-Agent={ua}"
-        list_item.setProperty('inputstream.adaptive.stream_headers', headers)
-        list_item.setProperty('inputstream.adaptive.manifest_update_parameter', f"|{headers}")
-        if kodi >= 21:
-            url = f"{url}|{headers}"
+        if not uses_isa or kodi < 21:
+            headers = f"Referer=https://webtv.tv&User-Agent={ua}"
+            list_item.setProperty('inputstream.adaptive.manifest_update_parameter', f"|{headers}")
+            if not uses_isa:
+                list_item.setProperty('inputstream.adaptive.stream_headers', headers)
+                if kodi >= 21:
+                    url = f"{url}|{headers}"
         
         list_item.setPath(url)
         list_item.setContentLookup(False)       

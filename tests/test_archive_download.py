@@ -32,13 +32,13 @@ class ArchiveDownloadTests(unittest.TestCase):
         self.session.get_cookies.return_value = {'session': 'fake-cookie', 'XSRF-TOKEN': 'fake-xsrf'}
         self.api = MagicMock()
         self.api.call_api.return_value = {'showIdentifier': 'fake-show'}
-        channels = MagicMock()
-        channels.get_channels_list.return_value = {'channel': {'radio': 0}}
+        self.channels = MagicMock()
+        self.channels.get_channels_list.return_value = {'channel': {'radio': 0}}
         modules = {
             'xbmc': self.xbmc, 'xbmcgui': self.gui, 'xbmcplugin': self.plugin, 'xbmcaddon': self.addons,
             'resources.lib.api': types.SimpleNamespace(API=lambda: self.api),
             'resources.lib.session': types.SimpleNamespace(Session=lambda: self.session),
-            'resources.lib.channels': types.SimpleNamespace(Channels=lambda: channels),
+            'resources.lib.channels': types.SimpleNamespace(Channels=lambda: self.channels),
             'resources.lib.epg': types.SimpleNamespace(get_channel_epg=MagicMock(), epg_listitem=MagicMock()),
             'resources.lib.quality': types.SimpleNamespace(apply_to_listitem=MagicMock()),
             'resources.lib.utils': types.SimpleNamespace(
@@ -56,6 +56,32 @@ class ArchiveDownloadTests(unittest.TestCase):
         self.stream = importlib.util.module_from_spec(spec)
         with patch.object(sys, 'argv', ['plugin://plugin.video.antik', '1']):
             spec.loader.exec_module(self.stream)
+
+    def test_live_manifest_and_stream_headers_are_sent_separately(self):
+        self.stream.ua = 'fake agent/1.0'
+        for version, playlist in ((19, 'mpd'), (20, 'm3u8'), (21, 'mpd'), (22, 'm3u8')):
+            with self.subTest(kodi=version, playlist=playlist):
+                self.api.call_api.return_value = {
+                    'data': {'streams': [{'url': 'https://example.test/live', 'playlist': playlist}]}}
+                self.stream.get_kodi_version = lambda: version
+                self.gui.ListItem.reset_mock()
+                self.stream.play_live('channel')
+                item = self.gui.ListItem.return_value
+                properties = dict(call.args for call in item.setProperty.call_args_list)
+                expected_headers = {'Referer': ['https://webtv.tv'], 'User-Agent': ['fake agent/1.0']}
+                self.assertEqual(parse_qs(properties['inputstream.adaptive.manifest_headers']), expected_headers)
+                self.assertEqual(parse_qs(properties['inputstream.adaptive.stream_headers']), expected_headers)
+                item.setPath.assert_called_once_with('https://example.test/live')
+
+    def test_live_radio_keeps_url_headers_without_inputstream(self):
+        self.channels.get_channels_list.return_value = {'channel': {'radio': 1}}
+        self.api.call_api.return_value = {
+            'data': {'streams': [{'url': 'https://example.test/radio.m3u8', 'playlist': 'm3u8'}]}}
+        self.stream.play_live('channel')
+        item = self.gui.ListItem.return_value
+        item.setPath.assert_called_once_with(
+            'https://example.test/radio.m3u8|Referer=https://webtv.tv&User-Agent=fake-agent')
+        self.assertNotIn('inputstream', dict(call.args for call in item.setProperty.call_args_list))
 
     def test_download_handoff_contains_verified_url_headers_and_title(self):
         title = 'Film, (Život) & spol.'
