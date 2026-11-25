@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import types
@@ -127,6 +128,7 @@ class ArchiveSearchUiTests(unittest.TestCase):
     def setUp(self):
         self.xbmc, self.gui, self.plugin, self.addon = (MagicMock() for _ in range(4))
         self.addon.Addon.return_value.getLocalizedString.side_effect = str
+        self.addon.Addon.return_value.getAddonInfo.return_value = 'addon-path'
         self.channels, self.search = MagicMock(), MagicMock()
         self.antik_cache = MagicMock()
         self.antik_cache.get.return_value = (False, None)
@@ -183,6 +185,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.assertEqual(metadata, {'title': 'Film', 'description': '', 'genres': [], 'art': {}})
         self.assertFalse(args[3])
         args[2].setProperty.assert_called_with('IsPlayable', 'true')
+        self.assertEqual(args[2].setArt.call_args.args[0], {
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
 
     def test_download_menu_in_search_and_day_program(self):
         from urllib.parse import parse_qs, urlencode, urlsplit
@@ -218,6 +225,10 @@ class ArchiveSearchUiTests(unittest.TestCase):
         metadata = json.loads(self.plugin.addDirectoryItem.call_args.args[1]['metadata'])
         self.assertEqual(metadata, {'title': 'Film & život', 'description': 'Popis relácie',
                                     'genres': ['film'], 'art': {'poster': 'https://example.test/cover.jpg'}})
+        item_art = self.plugin.addDirectoryItem.call_args.args[2].setArt.call_args.args[0]
+        self.assertEqual(item_art['poster'], 'https://example.test/cover.jpg')
+        self.assertEqual(item_art['thumb'], 'https://example.test/cover.jpg')
+        self.assertEqual(item_art['fanart'], os.path.join('addon-path', 'fanart.jpg'))
 
     def test_archive_channel_folder_uses_logo(self):
         self.channels.get_channels_list.return_value = {
@@ -227,7 +238,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.archive.channel_logo.return_value = 'station.png'
         self.archive.list_archive('Archive')
         search, channel = self.plugin.addDirectoryItem.call_args_list
-        search.args[2].setArt.assert_not_called()
+        search.args[2].setArt.assert_called_once_with({
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
         channel.args[2].setArt.assert_called_once_with({'icon': 'station.png', 'thumb': 'station.png'})
         self.assertTrue(channel.args[3])
 
@@ -316,7 +331,12 @@ class ArchiveSearchUiTests(unittest.TestCase):
         }
         self.archive.search_archive('Archive', query='Film')
         item = self.plugin.addDirectoryItem.call_args.args[2]
-        item.setArt.assert_called_once_with({'poster': cover, 'thumb': cover, 'fanart': landscape})
+        item.setArt.assert_called_once_with({
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'poster': cover,
+            'thumb': cover,
+            'fanart': landscape,
+        })
         item.setProperty.assert_called_with('IsPlayable', 'true')
         call = self.artwork.API.return_value.call_api.call_args.kwargs
         self.assertEqual(call['api'], 'program/detail')
@@ -338,7 +358,12 @@ class ArchiveSearchUiTests(unittest.TestCase):
                                                     'thumb': 'https://extendedepg-gonet.antik.sk/programme_icon/1'})
         self.archive.search_archive('Archive', query='Film')
         self.artwork.API.return_value.call_api.assert_not_called()
-        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once()
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
+            'thumb': 'https://extendedepg-gonet.antik.sk/programme_icon/1',
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
 
         self.antik_cache.get.return_value = (False, None)
         self.artwork.API.return_value.call_api.return_value = {
@@ -348,7 +373,11 @@ class ArchiveSearchUiTests(unittest.TestCase):
         }
         self.gui.ListItem.reset_mock()
         self.archive.search_archive('Archive', query='Film')
-        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_not_called()
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
 
     def test_artwork_api_failure_stops_lookups_but_keeps_all_results(self):
         self.channels.get_channels_list.return_value = {
@@ -361,11 +390,17 @@ class ArchiveSearchUiTests(unittest.TestCase):
         self.artwork.API.return_value.call_api.return_value = {'err': 'unavailable'}
         cached = {'poster': 'https://extendedepg-gonet.antik.sk/programme_icon/1'}
         self.antik_cache.get.side_effect = [(False, None), (True, cached)]
+        self.gui.ListItem.side_effect = [MagicMock(), MagicMock()]
         self.archive.search_archive('Archive', query='Film')
         self.assertEqual(self.plugin.addDirectoryItem.call_count, 2)
         self.artwork.API.return_value.call_api.assert_called_once()
         self.assertEqual(self.antik_cache.get.call_count, 2)
-        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with(cached)
+        self.plugin.addDirectoryItem.call_args_list[1].args[2].setArt.assert_called_once_with({
+            'icon': os.path.join('addon-path', 'resources', 'images', 'search.png'),
+            'poster': cached['poster'],
+            'thumb': cached['poster'],
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
         self.antik_cache.put.assert_not_called()
         self.gui.Dialog.return_value.notification.assert_not_called()
         self.xbmc.log.assert_called_once()

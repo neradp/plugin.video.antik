@@ -123,3 +123,41 @@ class ChannelManagementTests(unittest.TestCase):
         channels.save_channels.assert_not_called()
         channels.set_visibility('a', True)
         channels.save_channels.assert_called_once()
+
+
+class MainMenuArtworkTests(unittest.TestCase):
+    def test_main_menu_items_have_icons_and_fanart(self):
+        plugin = MagicMock()
+        list_items = [MagicMock() for _ in range(3)]
+        gui = MagicMock()
+        gui.ListItem.side_effect = list_items
+        addon = MagicMock()
+        addon.Addon.return_value.getAddonInfo.return_value = 'addon-path'
+        addon.Addon.return_value.getSetting.return_value = 'false'
+        modules = {
+            'xbmcgui': gui,
+            'xbmcplugin': plugin,
+            'xbmcaddon': addon,
+            'resources.lib.utils': types.SimpleNamespace(get_url=MagicMock(), check_settings=MagicMock()),
+            'resources.lib.session': MagicMock(),
+            'resources.lib.channels': MagicMock(),
+            'resources.lib.live': MagicMock(),
+            'resources.lib.archive': MagicMock(),
+            'resources.lib.stream': MagicMock(),
+            'resources.lib.settings': MagicMock(),
+            'resources.lib.iptvsc': MagicMock(),
+            'resources.lib.logo_updater': MagicMock(),
+        }
+        with patch.dict(sys.modules, modules):
+            module = load_module('test_main_menu_artwork', ROOT / 'main.py')
+        module._handle = 1
+        module.main_menu()
+        items = [entry.args[2] for entry in plugin.addDirectoryItem.call_args_list]
+        self.assertEqual(len(items), 3)
+        for item, name in zip(items, ('livetv.png', 'archive.png', 'settings.png')):
+            path = str(Path('addon-path') / 'resources' / 'images' / name)
+            item.setArt.assert_called_once_with({
+                'thumb': path,
+                'icon': path,
+                'fanart': str(Path('addon-path') / 'fanart.jpg'),
+            })

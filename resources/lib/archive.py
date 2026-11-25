@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import xbmc
 import xbmcgui
@@ -30,10 +31,14 @@ def add_download_menu(list_item, epg, addon):
 def list_archive(label):
     addon = xbmcaddon.Addon()    
     xbmcplugin.setPluginCategory(_handle, label)
+    addon_path = addon.getAddonInfo('path')
+    fanart = os.path.join(addon_path, 'fanart.jpg')
+    search_icon = os.path.join(addon_path, 'resources', 'images', 'search.png')
     channels = Channels()
     channels_list = channels.get_channels_list('channel_number')
     search_label = addon.getLocalizedString(300113)
     list_item = xbmcgui.ListItem(label = search_label)
+    list_item.setArt({'icon': search_icon, 'thumb': search_icon, 'fanart': fanart})
     url = get_url(action = 'search_archive', label = label + ' / ' + search_label)
     xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     for number in sorted(channels_list.keys()):  
@@ -51,6 +56,9 @@ def list_archive(label):
 
 def search_archive(label, query = None):
     addon = xbmcaddon.Addon()
+    addon_path = addon.getAddonInfo('path')
+    fanart = os.path.join(addon_path, 'fanart.jpg')
+    search_icon = os.path.join(addon_path, 'resources', 'images', 'search.png')
     if query is None:
         keyboard = xbmc.Keyboard('', addon.getLocalizedString(300113))
         keyboard.doModal()
@@ -85,8 +93,13 @@ def search_archive(label, query = None):
                           ' - ' + end.strftime('%H:%M') + ' | ' + channel['name'] + ' | ' + epg['title'])
             list_item = epg_listitem(xbmcgui.ListItem(label = item_label), epg, None)
             antik_art = artwork.get(epg)
-            if antik_art:
-                list_item.setArt(antik_art)
+            item_art = {'icon': search_icon}
+            item_art.update(antik_art)
+            if not item_art.get('thumb'):
+                item_art['thumb'] = item_art.get('poster') or search_icon
+            if not item_art.get('fanart'):
+                item_art['fanart'] = fanart
+            list_item.setArt(item_art)
             list_item.setProperty('IsPlayable', 'true')
             list_item.setContentLookup(False)
             metadata = {'title' : epg['title'], 'description' : epg.get('description') or '',

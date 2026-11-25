@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.0.3 - 2026-11-25
+
+- Refresh main-menu icons and fanart with original artwork.
+- Add archive-search icon and fanart fallback while preserving programme artwork.
+
 ## v0.0.2 - 2026-11-25
 
 - Align with the original add-on version 1.2.0: add request timeouts and improve EPG parsing and scheduled generation.

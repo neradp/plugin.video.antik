@@ -1,4 +1,4 @@
-﻿<addon id="plugin.video.antik" name="Antik TV" provider-name="waladir, neradp" version="0.0.2">
+﻿<addon id="plugin.video.antik" name="Antik TV" provider-name="waladir, neradp" version="0.0.3">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
     <import addon="script.module.requests" version="2.18.4"/>
@@ -28,6 +28,9 @@ Vychází z původního doplňku od waladira. Není spojený s Antikem ani jím 
     <platform>all</platform>
     <source>https://github.com/neradp/plugin.video.antik</source>
     <news>
+    v0.0.3
+    - Refresh main menu and archive search artwork with original Antik graphics
+
 v0.0.2
 - Align with upstream 1.2.0: improve EPG handling, add request timeouts and channel safeguards
 - Add IPTV Merge integration
@@ -39,6 +42,7 @@ Based on the original add-on version 1.2.0 by waladir.
    </news>
     <assets>
         <icon>icon.jpg</icon>
+        <fanart>fanart.jpg</fanart>
     </assets>
   </extension>
 </addon>

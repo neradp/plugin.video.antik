@@ -27,6 +27,8 @@ this fork.
 
 ## What's new in this fork
 
+- **Artwork:** Use original Antik-themed icons in the main menu and archive
+  search, with a matching fanart background and programme artwork when available.
 - **Archive search:** Search programme titles across visible channels and their
   configured archive retention. If retention is unknown, the search uses
   14 days. Results can also be requested through Kodi's JSON-RPC interface.
@@ -79,7 +81,7 @@ the existing configuration; there is no need to delete it. Enable the add-on
 and check its settings. If needed, enter your Antik credentials and select the
 service region.
 
-The fork's version (`0.0.2`) is lower than the original add-on's `1.2.0`.
+The fork's version (`0.0.3`) is lower than the original add-on's `1.2.0`.
 Kodi may treat replacing the original as a downgrade; check its
 prompts and the installed version.
 

@@ -24,21 +24,25 @@ if len(sys.argv) > 1:
 def main_menu():
     addon = xbmcaddon.Addon()
     icons_dir = os.path.join(addon.getAddonInfo('path'), 'resources','images')
+    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
 
     list_item = xbmcgui.ListItem(label = addon.getLocalizedString(300111))
     url = get_url(action='list_live', label = addon.getLocalizedString(300111))  
-    list_item.setArt({ 'thumb' : os.path.join(icons_dir , 'livetv.png'), 'icon' : os.path.join(icons_dir , 'livetv.png') })
+    list_item.setArt({'thumb': os.path.join(icons_dir, 'livetv.png'),
+                      'icon': os.path.join(icons_dir, 'livetv.png'), 'fanart': fanart})
     xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
 
     list_item = xbmcgui.ListItem(label = addon.getLocalizedString(300112))
     url = get_url(action='list_archive', label = addon.getLocalizedString(300112))  
-    list_item.setArt({ 'thumb' : os.path.join(icons_dir , 'archive.png'), 'icon' : os.path.join(icons_dir , 'archive.png') })
+    list_item.setArt({'thumb': os.path.join(icons_dir, 'archive.png'),
+                      'icon': os.path.join(icons_dir, 'archive.png'), 'fanart': fanart})
     xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
 
     if addon.getSetting('hide_settings') != 'true':
         list_item = xbmcgui.ListItem(label = addon.getLocalizedString(300100))
         url = get_url(action='list_settings', label = addon.getLocalizedString(300100))  
-        list_item.setArt({ 'thumb' : os.path.join(icons_dir , 'settings.png'), 'icon' : os.path.join(icons_dir , 'settings.png') })
+        list_item.setArt({'thumb': os.path.join(icons_dir, 'settings.png'),
+                          'icon': os.path.join(icons_dir, 'settings.png'), 'fanart': fanart})
         xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
 
     xbmcplugin.endOfDirectory(_handle)
