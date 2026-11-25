@@ -48,6 +48,9 @@ def main_menu():
     xbmcplugin.endOfDirectory(_handle)
 
 def router(paramstring):
+    addon = xbmcaddon.Addon()
+    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
+    xbmcplugin.setPluginFanart(_handle, fanart)
     params = dict(parse_qsl(paramstring))
     check_settings() 
     if params:

@@ -47,8 +47,10 @@ def list_archive(label):
                 channels_list[number]['archive_days'] = 7
             list_item = xbmcgui.ListItem(label=channels_list[number]['name'])
             logo = channel_logo(channels_list[number], addon)
+            item_art = {'fanart': fanart}
             if logo:
-                list_item.setArt({'icon' : logo, 'thumb' : logo})
+                item_art.update({'icon': logo, 'thumb': logo})
+            list_item.setArt(item_art)
             url = get_url(action='list_archive_days', id = channels_list[number]['id'], days = channels_list[number]['archive_days'], label = label + ' / ' + channels_list[number]['name'])  
             xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
@@ -111,9 +113,11 @@ def search_archive(label, query = None):
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
 def list_archive_days(id, label, days):
+    addon = xbmcaddon.Addon()
+    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
     channel = Channels().get_channels_list('id').get(id)
-    logo = channel_logo(channel, xbmcaddon.Addon()) if channel else None
+    logo = channel_logo(channel, addon) if channel else None
     for i in range (int(days) + 1):
         day = date.today() - timedelta(days = i)
         if i == 0:
@@ -126,14 +130,17 @@ def list_archive_days(id, label, days):
             den_label = day_translation_short[day.strftime('%w')] + ' ' + day.strftime('%d.%m')
             den = day_translation[day.strftime('%w')] + ' ' + day.strftime('%d.%m.%Y')
         list_item = xbmcgui.ListItem(label = den)
+        item_art = {'fanart': fanart}
         if logo:
-            list_item.setArt({'icon' : logo, 'thumb' : logo})
+            item_art.update({'icon': logo, 'thumb': logo})
+        list_item.setArt(item_art)
         url = get_url(action='list_program', id = id, day_min = i, label = label + ' / ' + den_label)  
         xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmcplugin.endOfDirectory(_handle, cacheToDisc = False)
 
 def list_program(id, day_min, label):
     addon = xbmcaddon.Addon()
+    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
     label = label.replace(addon.getLocalizedString(300112) + ' /','')
     xbmcplugin.setPluginCategory(_handle, label)
     xbmcplugin.setContent(_handle, 'twshows')
@@ -153,8 +160,11 @@ def list_program(id, day_min, label):
                 list_item = xbmcgui.ListItem(label = day_translation_short[datetime.fromtimestamp(epg[key]['startts']).strftime('%w')] + ' ' + datetime.fromtimestamp(epg[key]['startts']).strftime('%d.%m %H:%M') + ' - ' + datetime.fromtimestamp(epg[key]['endts']).strftime('%H:%M') + ' | ' + epg[key]['title'])
                 list_item = epg_listitem(list_item = list_item, epg = epg[key], logo = None)
                 antik_art = artwork.get(epg[key])
-                if antik_art:
-                    list_item.setArt(antik_art)
+                item_art = {'fanart': fanart}
+                item_art.update(antik_art)
+                if not item_art.get('fanart'):
+                    item_art['fanart'] = fanart
+                list_item.setArt(item_art)
                 list_item.setProperty('IsPlayable', 'true')
                 list_item.setContentLookup(False)
                 url = get_url(action='play_archive', id = epg[key]['channel_id'], start = epg[key]['start'], stop = epg[key]['stop'])

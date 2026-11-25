@@ -151,7 +151,9 @@ class MainMenuArtworkTests(unittest.TestCase):
         with patch.dict(sys.modules, modules):
             module = load_module('test_main_menu_artwork', ROOT / 'main.py')
         module._handle = 1
-        module.main_menu()
+        module.router('')
+        plugin.setPluginFanart.assert_called_once_with(
+            1, str(Path('addon-path') / 'fanart.jpg'))
         items = [entry.args[2] for entry in plugin.addDirectoryItem.call_args_list]
         self.assertEqual(len(items), 3)
         for item, name in zip(items, ('livetv.png', 'archive.png', 'settings.png')):

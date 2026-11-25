@@ -243,7 +243,10 @@ class ArchiveSearchUiTests(unittest.TestCase):
             'thumb': os.path.join('addon-path', 'resources', 'images', 'search.png'),
             'fanart': os.path.join('addon-path', 'fanart.jpg'),
         })
-        channel.args[2].setArt.assert_called_once_with({'icon': 'station.png', 'thumb': 'station.png'})
+        channel.args[2].setArt.assert_called_once_with({
+            'icon': 'station.png', 'thumb': 'station.png',
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
         self.assertTrue(channel.args[3])
 
     def test_archive_days_use_channel_logo(self):
@@ -258,7 +261,10 @@ class ArchiveSearchUiTests(unittest.TestCase):
         calls = self.plugin.addDirectoryItem.call_args_list
         self.assertEqual(len(calls), 3)
         for day, (item, call) in enumerate(zip(items, calls)):
-            item.setArt.assert_called_once_with({'icon': 'station.png', 'thumb': 'station.png'})
+            item.setArt.assert_called_once_with({
+                'icon': 'station.png', 'thumb': 'station.png',
+                'fanart': os.path.join('addon-path', 'fanart.jpg'),
+            })
             self.assertEqual(call.args[1]['action'], 'list_program')
             self.assertEqual(call.args[1]['id'], '1')
             self.assertEqual(call.args[1]['day_min'], day)
@@ -271,7 +277,9 @@ class ArchiveSearchUiTests(unittest.TestCase):
                 self.archive.channel_logo.return_value = None
                 self.gui.ListItem.reset_mock()
                 self.archive.list_archive_days('1', 'Archive / One', '0')
-                self.gui.ListItem.return_value.setArt.assert_not_called()
+                self.gui.ListItem.return_value.setArt.assert_called_once_with({
+                    'fanart': os.path.join('addon-path', 'fanart.jpg'),
+                })
         self.archive.channel_logo.assert_called_once()
 
     def test_archive_program_artwork_is_attached(self):
@@ -289,6 +297,17 @@ class ArchiveSearchUiTests(unittest.TestCase):
                          {'action': 'play_archive', 'id': '1', 'start': 'start', 'stop': 'stop'})
         self.artwork.API.assert_not_called()
         self.antik_cache.close.assert_called_once()
+
+    def test_archive_program_uses_default_fanart_when_artwork_is_missing(self):
+        now = datetime.now().timestamp()
+        program = {'title': 'Film', 'startts': now - 3600, 'endts': now - 60,
+                   'channel_id': '1', 'start': 'start', 'stop': 'stop'}
+        self.archive.get_channel_epg.return_value = {1: program}
+        self.antik_cache.get.return_value = (True, {})
+        self.archive.list_program('1', '0', 'Archive / One / Today')
+        self.plugin.addDirectoryItem.call_args.args[2].setArt.assert_called_once_with({
+            'fanart': os.path.join('addon-path', 'fanart.jpg'),
+        })
 
     def test_cancel_and_errors(self):
         self.xbmc.Keyboard.return_value.isConfirmed.return_value = False
@@ -460,19 +479,25 @@ class StationLogoTests(unittest.TestCase):
             2: {'id': 'joj_cinema', 'name': 'Second'},
             3: {'id': 'missing', 'name': 'Third'},
         }
-        self.epg.return_value = {'stv_1': {'title': 'Film', 'startts': 1000000000, 'endts': 1000003600}}
+        self.epg.return_value = {
+            'stv_1': {'title': 'Film', 'startts': 1000000000, 'endts': 1000003600},
+            'joj_cinema': {'title': 'News', 'startts': 1000000000, 'endts': 1000003600},
+        }
         fanart = 'https://extendedepg-gonet.antik.sk/programme_icon/1'
-        self.artwork.get.return_value = {'fanart': fanart}
+        self.artwork.get.side_effect = [{'fanart': fanart}, {}]
         items = [MagicMock(), MagicMock(), MagicMock()]
         self.gui.ListItem.side_effect = items
         live.list_live('Live')
-        for item, ident in zip(items[:2], ('stv_1', 'joj_cinema')):
-            path = str(self.logo_dir / (ident + '.png'))
-            item.setArt.assert_any_call({'icon': path, 'thumb': path})
+        default_fanart = str(Path(self.addon.Addon.return_value.getAddonInfo.return_value) / 'fanart.jpg')
+        for item, ident, expected_fanart in zip(
+                items, ('stv_1', 'joj_cinema', 'missing'), (fanart, default_fanart, default_fanart)):
+            art = {'fanart': expected_fanart}
+            if ident != 'missing':
+                path = str(self.logo_dir / (ident + '.png'))
+                art.update({'icon': path, 'thumb': path})
+            item.setArt.assert_called_once_with(art)
             item.setProperty.assert_called_once_with('IsPlayable', 'true')
-        items[0].setArt.assert_any_call({'fanart': fanart})
-        self.artwork.get.assert_called_once_with(self.epg.return_value['stv_1'])
-        items[2].setArt.assert_not_called()
+        self.assertEqual(self.artwork.get.call_count, 2)
         self.assertEqual(self.plugin.addDirectoryItem.call_count, 3)
 
 

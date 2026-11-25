@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import xbmcgui
 import xbmcplugin
@@ -17,6 +18,7 @@ if len(sys.argv) > 1:
 def list_live(label):
     kodi_version = get_kodi_version()
     addon = xbmcaddon.Addon()
+    fanart = os.path.join(addon.getAddonInfo('path'), 'fanart.jpg')
     xbmcplugin.setPluginCategory(_handle, label)
     xbmcplugin.setContent(_handle, 'twshows')
     channels = Channels()
@@ -30,12 +32,16 @@ def list_live(label):
                 list_item = xbmcgui.ListItem(label = channels_list[num]['name'] + ' | ' + epg_item['title'] + ' | ' + datetime.fromtimestamp(epg_item['startts']).strftime('%H:%M') + ' - ' + datetime.fromtimestamp(epg_item['endts']).strftime('%H:%M'))
                 list_item = epg_listitem(list_item = list_item, epg = epg_item, logo = None)
                 antik_art = artwork.get(epg_item)
-                if antik_art:
-                    list_item.setArt(antik_art)
+                item_art = {'fanart': fanart}
+                item_art.update(antik_art)
+                if not item_art.get('fanart'):
+                    item_art['fanart'] = fanart
             else:
                 list_item = xbmcgui.ListItem(label = channels_list[num]['name'])
+                item_art = {'fanart': fanart}
             if logo:
-                list_item.setArt({'icon' : logo, 'thumb' : logo})
+                item_art.update({'icon': logo, 'thumb': logo})
+            list_item.setArt(item_art)
             if kodi_version >= 20:
                 infotag = list_item.getVideoInfoTag()
                 infotag.setMediaType('movie')
