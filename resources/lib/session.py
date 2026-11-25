@@ -28,14 +28,14 @@ class Session:
         addon = xbmcaddon.Addon()
         session = requests.Session()
         api = API()
-        req = session.get(get_api_url() + 'sanctum/csrf-cookie', headers = api.headers)
-        if req.status_code not in [200, 201, 204]:
+        csrf_response = session.get(get_api_url() + 'sanctum/csrf-cookie', headers = api.headers, timeout = 30)
+        if csrf_response.status_code not in [200, 201, 204]:
             xbmcgui.Dialog().notification('Antik TV',addon.getLocalizedString(300206), xbmcgui.NOTIFICATION_ERROR, 5000)
             sys.exit() 
         post = {'login' : addon.getSetting('username'), 'password' : addon.getSetting('password')} 
-        session.post(get_api_url() + 'login', json = post, headers = api.headers)
+        login_response = session.post(get_api_url() + 'login', json = post, headers = api.headers, timeout = 30)
         cookies = session.cookies.get_dict()
-        if req.status_code not in [200, 201, 204] or get_session_cookie() not in cookies or len(cookies[get_session_cookie()]) == 0 or 'XSRF-TOKEN' not in cookies or len(cookies['XSRF-TOKEN']) == 0:
+        if login_response.status_code not in [200, 201, 204] or get_session_cookie() not in cookies or len(cookies[get_session_cookie()]) == 0 or 'XSRF-TOKEN' not in cookies or len(cookies['XSRF-TOKEN']) == 0:
             xbmcgui.Dialog().notification('Antik TV',addon.getLocalizedString(300206), xbmcgui.NOTIFICATION_ERROR, 5000)
             sys.exit() 
         self.sessionid = cookies[get_session_cookie()]

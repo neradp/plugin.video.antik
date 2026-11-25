@@ -66,6 +66,6 @@ jobs:
           archive="$RUNNER_TEMP/plugin.video.antik-$version.zip"
           git archive --format=zip --prefix=plugin.video.antik/ --output="$archive" \
             "$GITHUB_SHA" addon.xml main.py service.py icon.jpg resources \
-            LICENSE.txt
+            LICENSE.txt .iptv_merge
           gh release create "$GITHUB_REF_NAME" "$archive" \
             --verify-tag --title "Antik TV $GITHUB_REF_NAME" --notes-file "$notes"

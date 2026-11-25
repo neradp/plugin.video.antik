@@ -16,8 +16,6 @@ from resources.lib.epg import get_channels_epg
 from resources.lib.station_logos import channel_logo
 from resources.lib.program_artwork import ProgramArtwork
 
-tz_offset = int(datetime.now(timezone.utc).astimezone().utcoffset().total_seconds() / 3600)
-
 def save_file_test():
     addon = xbmcaddon.Addon()  
     try:
@@ -134,9 +132,9 @@ def generate_epg(output_file = '', show_progress = True):
                     for epg_item in epg:
                         if monitor.abortRequested():
                             return
-                        starttime = datetime.fromtimestamp(epg_item['startts']).strftime('%Y%m%d%H%M%S')
-                        endtime = datetime.fromtimestamp(epg_item['endts']).strftime('%Y%m%d%H%M%S')
-                        content = content + '    <programme start="' + starttime + ' +0' + str(tz_offset) + '00" stop="' + endtime + ' +0' + str(tz_offset) + '00" channel="' + replace_by_html_entity(channels_list_by_id[epg_item['channel_id']]['name']) + '">\n'
+                        starttime = datetime.fromtimestamp(epg_item['startts'], timezone.utc).strftime('%Y%m%d%H%M%S')
+                        endtime = datetime.fromtimestamp(epg_item['endts'], timezone.utc).strftime('%Y%m%d%H%M%S')
+                        content = content + '    <programme start="' + starttime + ' +0000" stop="' + endtime + ' +0000" channel="' + replace_by_html_entity(channels_list_by_id[epg_item['channel_id']]['name']) + '">\n'
                         content = content + '       <title lang="cs">' + replace_by_html_entity(str(epg_item['title'])) + '</title>\n'
                         if epg_item['description'] != None and len(epg_item['description']) > 0:
                             content = content + '       <desc lang="cs">' + replace_by_html_entity(epg_item['description']) + '</desc>\n'

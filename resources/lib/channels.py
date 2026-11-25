@@ -88,6 +88,14 @@ def change_channels_numbers(from_number, direction):
         if change > 0:
             if direction == 'decrease':
                 change = change * -1
+                channels_nums = channels.get_channels_list('channel_number', visible_filter = False)
+                for number in range(int(from_number) + change, int(from_number)):
+                    if number < 1:
+                        xbmcgui.Dialog().notification('Antik TV', addon.getLocalizedString(300213), xbmcgui.NOTIFICATION_ERROR, 5000)
+                        return
+                    if number in channels_nums:
+                        xbmcgui.Dialog().notification('Antik TV', 'Číslo kanálu ' + str(number) + addon.getLocalizedString(300212) + channels_nums[number]['name'], xbmcgui.NOTIFICATION_ERROR, 5000)
+                        return
             channels.change_channels_numbers(from_number, change)
             xbmc.executebuiltin('Container.Refresh')
         else:  
@@ -228,9 +236,10 @@ class Channels:
         self.valid_to = -1
         self.load_channels()
 
-    def set_visibility(self, id, visibility):
+    def set_visibility(self, id, visibility, save = True):
         self.channels[id].update({'visible' : visibility})
-        self.save_channels()
+        if save == True:
+            self.save_channels()
 
     def set_number(self, id, number):
         if id in self.channels:
@@ -483,16 +492,18 @@ class Channels_groups:
             self.selected = None
             channels_list = channels.get_channels_list(visible_filter = False)
             for channel in channels_list:
-                channels.set_visibility(channel, True)
+                channels.set_visibility(channel, True, save = False)
+            channels.save_channels()
         else:
             self.selected = group
             if group in self.channels and len(self.channels[group]):
                 channels_list = channels.get_channels_list(visible_filter = False)
                 for channel in channels_list:
                     if channels_list[channel]['name'] in self.channels[group]:
-                        channels.set_visibility(channel, True)
+                        channels.set_visibility(channel, True, save = False)
                     else:
-                        channels.set_visibility(channel, False)
+                        channels.set_visibility(channel, False, save = False)
+                channels.save_channels()
         self.save_channels_groups()      
 
     def load_channels_groups(self):

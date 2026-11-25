@@ -35,6 +35,8 @@ this fork.
   are cached for 20 days; the first lookup or EPG generation can take longer.
 - **Station logos:** Show local channel logos in Kodi and include them in M3U
   and XMLTV exports. A configured Picons server takes precedence.
+- **IPTV Merge:** Provide the generated playlist and XMLTV guide as a source
+  for the optional IPTV Merge add-on.
 - **Archive downloads:** Send archive programmes from the context menu to my
   separate `script.stream.saver` add-on for downloading.
 - **Archive playback:** Estimate where a programme begins by subtracting its
@@ -77,8 +79,8 @@ the existing configuration; there is no need to delete it. Enable the add-on
 and check its settings. If needed, enter your Antik credentials and select the
 service region.
 
-The fork starts at version `0.0.1`, which is lower than the original add-on's
-`1.1.9`. Kodi may treat replacing the original as a downgrade; check its
+The fork's version (`0.0.2`) is lower than the original add-on's `1.2.0`.
+Kodi may treat replacing the original as a downgrade; check its
 prompts and the installed version.
 
 ### Requirements and optional components
@@ -93,6 +95,8 @@ prompts and the installed version.
   through the context menu. It does not have its own repository yet.
 - **IPTV Simple Client** is optional and can use the generated M3U playlist
   and XMLTV guide.
+- **IPTV Merge** is optional and can use the generated playlist and XMLTV guide
+  as one of its input sources.
 
 ### Station logos
 
@@ -182,8 +186,9 @@ those changes, then create and push a tag such as `v0.0.1`. The release workflow
 checks the tag, version and changelog, then publishes a GitHub release with a
 Kodi-installable ZIP. Its description comes from that changelog entry.
 
-The tag must point to a commit on `master`. The ZIP contains the add-on files
-and license, but no tests, documentation or locally generated station logos.
+The tag must point to a commit on `master`. The ZIP contains the add-on files,
+license and IPTV Merge integration configuration, but no tests, documentation
+or locally generated station logos.
 
 ## Credits
 

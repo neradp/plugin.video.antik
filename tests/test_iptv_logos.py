@@ -5,6 +5,7 @@ import tempfile
 import types
 import unittest
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -105,6 +106,12 @@ class IptvLogoTests(unittest.TestCase):
         self.assertIn('tvg-logo="' + expected + '"', playlist)
         self.assertEqual(icon, expected)
 
+    def test_ffmpegdirect_properties_remain_when_enabled(self):
+        self.settings['isa'] = 'true'
+        playlist, _ = self.generate()
+        self.assertIn('#KODIPROP:inputstream=inputstream.ffmpegdirect\n', playlist)
+        self.assertIn('#KODIPROP:inputstream.ffmpegdirect.stream_mode=timeshift\n', playlist)
+
     def test_missing_local_logo_uses_original_url_or_empty(self):
         self.channel['id'] = 'missing'
         playlist, icon = self.generate()
@@ -127,6 +134,14 @@ class IptvLogoTests(unittest.TestCase):
         self.iptv.generate_epg('epg', show_progress=False)
         root = ET.fromstring(self.files['epg'].content.decode('utf-8'))
         self.assertIsNone(root.find('programme/icon'))
+
+    def test_xmltv_timestamps_are_written_in_utc(self):
+        self.iptv.generate_epg('epg', show_progress=False)
+        programme = ET.fromstring(self.files['epg'].content.decode('utf-8')).find('programme')
+        expected_start = datetime.fromtimestamp(1700000000, timezone.utc).strftime('%Y%m%d%H%M%S') + ' +0000'
+        expected_stop = datetime.fromtimestamp(1700003600, timezone.utc).strftime('%Y%m%d%H%M%S') + ' +0000'
+        self.assertEqual(programme.attrib['start'], expected_start)
+        self.assertEqual(programme.attrib['stop'], expected_stop)
 
     def test_abort_does_not_replace_existing_epg(self):
         old = CapturedFile()

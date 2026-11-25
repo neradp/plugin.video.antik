@@ -9,7 +9,7 @@ class API:
     def __init__(self):
         self.headers = {'User-Agent' : ua, 'Accept' : '*/*', 'Content-type' : 'application/json;charset=UTF-8'} 
 
-    def call_api(self, api, method, cookies, data = None, timeout = None):
+    def call_api(self, api, method, cookies, data = None, timeout = 30):
         url = get_api_url() + api
         addon = xbmcaddon.Addon()
         if addon.getSetting('log_request_url') == 'true':

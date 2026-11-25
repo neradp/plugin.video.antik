@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.2 - 2026-11-25
+
+- Align with the original add-on version 1.2.0: add request timeouts and improve EPG parsing and scheduled generation.
+- Write XMLTV programme times in UTC and guard channel-number changes against collisions.
+- Save channel visibility after applying a group and add IPTV Merge integration.
+- Retain the fork's FFmpegDirect playlist settings.
+
 ## v0.0.1 - 2026-11-24
 
 - Initial release of the personal fork, based on the original add-on version 1.1.9 by waladir.

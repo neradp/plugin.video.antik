@@ -98,6 +98,30 @@ class ArchiveSearchTests(unittest.TestCase):
         self.assertEqual([item['title'] for item in result], ['12345'])
         self.modules['xbmc'].log.assert_called_once()
 
+    def test_channel_epg_handles_non_list_response(self):
+        self.api.call_api.return_value = {'err': 'unavailable'}
+        self.assertEqual(self.epg.get_channel_epg('a', int(self.now.timestamp()), int(self.now.timestamp())), {})
+
+    def test_channel_epg_normalizes_missing_description(self):
+        item = self.item('a', 'Program', self.now)
+        item['Description'] = None
+        self.api.call_api.return_value = [{'epg': [item]}]
+        addon = self.modules['xbmcaddon'].Addon.return_value
+        addon.getSetting.side_effect = lambda name: {'epg_from': '0', 'epg_to': '1'}.get(name, '')
+        with patch.object(self.epg.time, 'sleep'):
+            result = self.epg.get_channels_epg(['a'])
+        self.assertEqual(result[0]['description'], '')
+
+    def test_parse_epg_item_normalizes_missing_description(self):
+        item = self.item('a', 'Program', self.now)
+        item['Description'] = None
+        self.assertEqual(self.epg.parse_epg_item(item)['description'], '')
+
+    def test_epg_listitem_skips_none_description(self):
+        list_item = MagicMock()
+        self.epg.epg_listitem(list_item, {'description': None}, None)
+        list_item.getVideoInfoTag.return_value.setPlot.assert_not_called()
+
 
 class ArchiveSearchUiTests(unittest.TestCase):
     def setUp(self):
@@ -491,7 +515,7 @@ class ArtworkCacheTests(unittest.TestCase):
 
 
 class ApiTimeoutTests(unittest.TestCase):
-    def test_timeout_is_optional_for_existing_callers(self):
+    def test_api_calls_use_default_timeout_and_allow_overrides(self):
         requests = MagicMock()
         modules = {
             'xbmc': MagicMock(), 'xbmcaddon': MagicMock(), 'requests': requests,
@@ -500,7 +524,7 @@ class ApiTimeoutTests(unittest.TestCase):
         with patch.dict(sys.modules, modules):
             api = load_module('test_api', LIB / 'api.py').API()
             api.call_api('program/detail', 'post', {}, {'x': 1})
-            self.assertNotIn('timeout', requests.post.call_args.kwargs)
+            self.assertEqual(requests.post.call_args.kwargs['timeout'], 30)
             api.call_api('program/detail', 'post', {}, {'x': 1}, timeout=10)
             self.assertEqual(requests.post.call_args.kwargs['timeout'], 10)
 
